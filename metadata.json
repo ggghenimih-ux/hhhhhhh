@@ -1,0 +1,6 @@
+{
+  "name": "Outils Réparation GSM - Tunisie",
+  "description": "Plateforme e-commerce spécialisée dans la vente d'outils et équipements professionnels de réparation pour smartphones et électronique en Tunisie (inspirée de goods.tn).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

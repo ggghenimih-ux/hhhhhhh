@@ -1,0 +1,13 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Local database & user uploads must never be committed
+prisma/*.db
+prisma/*.db-journal
+uploads/
