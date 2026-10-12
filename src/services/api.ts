@@ -83,7 +83,7 @@ export const api = {
         body: JSON.stringify(productData),
       }),
     delete: (id: string) =>
-      request<ApiResponse<any>>(`/api/products/${id}`, {
+      request<ApiResponse<any> & { softDeleted?: boolean; deleted?: boolean }>(`/api/products/${id}`, {
         method: 'DELETE',
       }),
     patchStatus: (id: string, isActive?: boolean) =>
@@ -181,10 +181,75 @@ export const api = {
       return request<ApiResponse<any[]>>(`/api/orders/admin/all${query ? `?${query}` : ''}`);
     },
     getAdminStats: () => request<ApiResponse<any>>('/api/orders/admin/stats'),
+    previewArchive: (fromDate: string, toDate: string) => {
+      const searchParams = new URLSearchParams({ fromDate, toDate });
+      return request<ApiResponse<{ count: number; fromDate: string; toDate: string }> & { count: number }>(
+        `/api/orders/admin/archive/preview?${searchParams.toString()}`,
+      );
+    },
+    exportArchive: async (fromDate: string, toDate: string) => {
+      const headers = new Headers({ 'Content-Type': 'application/json' });
+      try {
+        const localToken = localStorage.getItem('gsm_token');
+        if (localToken) headers.set('Authorization', `Bearer ${localToken}`);
+      } catch {
+        // The HttpOnly cookie remains available when localStorage is restricted.
+      }
+
+      const response = await fetch('/api/orders/admin/archive/export', {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ fromDate, toDate }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.message || `Erreur serveur (${response.status})`);
+      }
+      return {
+        data: await response.json(),
+        token: response.headers.get('X-Order-Archive-Token'),
+      };
+    },
+    archiveExported: (token: string, confirmedCount: number) =>
+      request<ApiResponse<{ archivedCount: number }>>('/api/orders/admin/archive/apply', {
+        method: 'POST',
+        body: JSON.stringify({ token, confirmedCount }),
+      }),
+    getArchived: (params: Record<string, any> = {}) => {
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '') {
+          searchParams.append(key, String(val));
+        }
+      });
+      const query = searchParams.toString();
+      return request<ApiResponse<any[]>>(
+        `/api/orders/admin/archive/archived${query ? `?${query}` : ''}`,
+      );
+    },
+    restoreArchived: (id: string) =>
+      request<ApiResponse<any>>(`/api/orders/admin/archive/${encodeURIComponent(id)}/restore`, {
+        method: 'PATCH',
+      }),
     updateStatus: (id: string, status: string, paymentStatus?: string) =>
       request<ApiResponse<any>>(`/api/orders/${id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status, paymentStatus }),
+      }),
+    update: (id: string, data: {
+      customerName: string;
+      customerPhone: string;
+      customerEmail?: string | null;
+      governorate: string;
+      delegation?: string | null;
+      address: string;
+      notes?: string | null;
+      paymentMethod?: 'cod' | 'bank_transfer' | 'online';
+    }) =>
+      request<ApiResponse<any>>(`/api/orders/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
       }),
     delete: (id: string) =>
       request<ApiResponse<any>>(`/api/orders/${id}`, {
@@ -218,6 +283,18 @@ export const api = {
       }
       return res;
     },
+    firebase: async (idToken: string) => {
+      const res = await request<ApiResponse<any>>('/api/auth/firebase', {
+        method: 'POST',
+        body: JSON.stringify({ idToken }),
+      });
+      if (res?.token) {
+        try {
+          localStorage.setItem('gsm_token', res.token);
+        } catch {}
+      }
+      return res;
+    },
     logout: async () => {
       try {
         localStorage.removeItem('gsm_token');
@@ -227,6 +304,24 @@ export const api = {
       });
     },
     getMe: () => request<ApiResponse<any>>('/api/auth/me'),
+  },
+
+  adminUsers: {
+    getAll: (params: { page?: number; limit?: number; search?: string } = {}) => {
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, val]) => {
+        if (val !== undefined && val !== '') searchParams.set(key, String(val));
+      });
+      const query = searchParams.toString();
+      return request<ApiResponse<any[]>>(
+        `/api/admin/users${query ? `?${query}` : ''}`,
+      );
+    },
+    updateRole: (id: string, role: 'ADMIN' | 'CUSTOMER') =>
+      request<ApiResponse<any>>(`/api/admin/users/${encodeURIComponent(id)}/role`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role }),
+      }),
   },
 
   // Reviews

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useStore } from '../context/StoreContext';
+import { useStoreProducts, useStoreSettings } from '../context/StoreSlices';
 import { ProductCard } from './ProductCard';
 import { FilterDrawer } from './FilterDrawer';
 import {
@@ -15,14 +15,18 @@ export const ProductListing: React.FC = () => {
     t,
     language,
     formatPrice,
-    getLocalizedName,
+  } = useStoreSettings();
+  const {
     categories,
+    getLocalizedName,
     filters,
     setFilters,
     resetFilters,
     filteredProducts,
-    products
-  } = useStore();
+    products,
+    productPagination,
+    setProductPage,
+  } = useStoreProducts();
 
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
 
@@ -53,14 +57,14 @@ export const ProductListing: React.FC = () => {
 
             {/* Total Results Count */}
             <div className="text-xs text-slate-600">
-              <span className="font-bold text-slate-900">{filteredProducts.length}</span>{' '}
+              <span className="font-bold text-slate-900">{productPagination.total}</span>{' '}
               {t.productsFound || 'produits trouvés'}
             </div>
 
             {/* Active filter tags */}
             {filters.category && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-orange-50 text-orange-800 text-xs font-medium border border-orange-200">
-                <span>{getLocalizedName(categories.find((c) => c.id === filters.category)) || filters.category}</span>
+                <span>{getLocalizedName(categories.find((c) => c.slug === filters.category)) || filters.category}</span>
                 <button
                   type="button"
                   onClick={() => setFilters((prev) => ({ ...prev, category: null, subcategory: null }))}
@@ -161,7 +165,7 @@ export const ProductListing: React.FC = () => {
                   </button>
 
                   {categories.map((c) => {
-                    const active = filters.category === c.id;
+                    const active = filters.category === c.slug;
                     return (
                       <button
                         key={c.id}
@@ -169,7 +173,7 @@ export const ProductListing: React.FC = () => {
                         onClick={() =>
                           setFilters((prev) => ({
                             ...prev,
-                            category: active ? null : c.id,
+                            category: active ? null : c.slug,
                             subcategory: null,
                           }))
                         }
@@ -247,16 +251,6 @@ export const ProductListing: React.FC = () => {
                 <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
                   <input
                     type="checkbox"
-                    checked={filters.inStockOnly}
-                    onChange={(e) => setFilters((prev) => ({ ...prev, inStockOnly: e.target.checked }))}
-                    className="rounded border-slate-300 text-orange-600 focus:ring-orange-500"
-                  />
-                  <span>{t.inStockOnly || 'En stock uniquement'}</span>
-                </label>
-
-                <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
                     checked={filters.discountOnly}
                     onChange={(e) => setFilters((prev) => ({ ...prev, discountOnly: e.target.checked }))}
                     className="rounded border-slate-300 text-orange-600 focus:ring-orange-500"
@@ -295,6 +289,29 @@ export const ProductListing: React.FC = () => {
                 {filteredProducts.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}
+              </div>
+            )}
+            {productPagination.totalPages > 1 && (
+              <div className="mt-6 flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setProductPage(productPagination.page - 1)}
+                  disabled={productPagination.page <= 1}
+                  className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-semibold disabled:opacity-40"
+                >
+                  {language === 'ar' ? 'السابق' : 'Précédent'}
+                </button>
+                <span className="text-xs text-slate-600">
+                  {productPagination.page} / {productPagination.totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setProductPage(productPagination.page + 1)}
+                  disabled={productPagination.page >= productPagination.totalPages}
+                  className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-semibold disabled:opacity-40"
+                >
+                  {language === 'ar' ? 'التالي' : 'Suivant'}
+                </button>
               </div>
             )}
           </main>

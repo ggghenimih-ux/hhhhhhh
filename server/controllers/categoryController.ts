@@ -48,7 +48,7 @@ export const createCategory = async (req: Request, res: Response, next: NextFunc
         description: validated.description || null,
         image: validated.image || null,
         isActive: validated.isActive ?? true,
-        order: req.body.order ? parseInt(req.body.order, 10) : 0,
+        order: validated.order ?? 0,
       },
     });
 
@@ -65,17 +65,17 @@ export const createCategory = async (req: Request, res: Response, next: NextFunc
 export const updateCategory = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const body = req.body;
+    const body = CategorySchema.partial().parse(req.body);
 
     const updated = await prisma.category.update({
       where: { id },
       data: {
-        ...(body.name && { name: body.name }),
-        ...(body.slug && { slug: body.slug }),
+        ...(body.name !== undefined && { name: body.name }),
+        ...(body.slug !== undefined && { slug: body.slug }),
         ...(body.description !== undefined && { description: body.description }),
         ...(body.image !== undefined && { image: body.image }),
-        ...(body.isActive !== undefined && { isActive: Boolean(body.isActive) }),
-        ...(body.order !== undefined && { order: parseInt(body.order, 10) }),
+        ...(body.isActive !== undefined && { isActive: body.isActive }),
+        ...(body.order !== undefined && { order: body.order }),
       },
     });
 

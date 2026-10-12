@@ -1,9 +1,9 @@
 import React from 'react';
-import { useStore } from '../context/StoreContext';
+import { useStoreNotifications } from '../context/StoreSlices';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 export const Toasts: React.FC = () => {
-  const { toasts, removeToast } = useStore();
+  const { toasts, removeToast } = useStoreNotifications();
 
   if (toasts.length === 0) return null;
 
@@ -28,6 +28,7 @@ export const Toasts: React.FC = () => {
           </div>
           <button
             onClick={() => removeToast(toast.id)}
+            aria-label="Fermer la notification"
             className="p-1 rounded-lg hover:bg-white/20 transition text-white/80 hover:text-white"
           >
             <X className="w-4 h-4" />

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { api } from '../../services/api';
+import { useDialogAccessibility } from '../../hooks/useDialogAccessibility';
+import { isUnlimitedStock } from '../../utils/stock';
 import {
   Package,
   Plus,
@@ -25,9 +27,17 @@ import {
 
 interface AdminProductsTabProps {
   onRefreshData?: () => void;
+  initialProductId?: string;
+  initialProductAction?: 'edit' | 'delete';
+  onInitialActionHandled?: () => void;
 }
 
-export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshData }) => {
+export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
+  onRefreshData,
+  initialProductId,
+  initialProductAction,
+  onInitialActionHandled,
+}) => {
   const { categories, formatPrice, refreshProducts, showToast, navigateTo } = useStore();
 
   const [products, setProducts] = useState<any[]>([]);
@@ -37,7 +47,6 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'price_asc' | 'price_desc' | 'name'>('newest');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
@@ -45,10 +54,12 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
   // Deletion & Confirmation Modal State
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [productToDelete, setProductToDelete] = useState<any | null>(null);
+  const deleteDialogRef = useDialogAccessibility(Boolean(productToDelete), () => setProductToDelete(null));
 
   // Add / Edit Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
+  const productDialogRef = useDialogAccessibility(isModalOpen, () => setIsModalOpen(false));
 
   // Form Fields
   const [formName, setFormName] = useState('');
@@ -70,14 +81,26 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const handledInitialAction = useRef<string | null>(null);
 
   // Load products from API
   const fetchProducts = async () => {
     try {
       setIsLoading(true);
-      const res = await api.products.getAll({ limit: 100, status: 'all', admin: 'true' });
+      const res = await api.products.getAll({ page: 1, limit: 100, status: 'all', admin: 'true' });
       if (res?.data && Array.isArray(res.data)) {
-        setProducts(res.data);
+        const allProducts = [...res.data];
+        const totalPages = res.pagination?.totalPages ?? 1;
+
+        for (let page = 2; page <= totalPages; page += 1) {
+          const pageRes = await api.products.getAll({ page, limit: 100, status: 'all', admin: 'true' });
+          if (!Array.isArray(pageRes?.data)) {
+            throw new Error('Erreur lors du chargement des produits.');
+          }
+          allProducts.push(...pageRes.data);
+        }
+
+        setProducts(allProducts);
       }
     } catch (err: any) {
       showToast(err.message || 'Erreur lors du chargement des produits.', 'error');
@@ -89,6 +112,32 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    if (!initialProductId || !initialProductAction || isLoading) return;
+    const actionKey = `${initialProductId}:${initialProductAction}`;
+    if (handledInitialAction.current === actionKey) return;
+    handledInitialAction.current = actionKey;
+
+    const openRequestedProduct = async () => {
+      try {
+        const product = products.find((item) => item.id === initialProductId)
+          || (await api.products.getById(initialProductId))?.data;
+        if (!product) {
+          showToast('Produit introuvable.', 'error');
+          return;
+        }
+        if (initialProductAction === 'edit') handleOpenEdit(product);
+        else setProductToDelete(product);
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'Impossible de charger le produit.', 'error');
+      } finally {
+        onInitialActionHandled?.();
+      }
+    };
+
+    void openRequestedProduct();
+  }, [initialProductId, initialProductAction, isLoading, products]);
 
   // Open modal for Create
   const handleOpenCreate = () => {
@@ -119,7 +168,7 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
     setFormCategory(prod.category || categories[0]?.slug || 'soldering-hot-air');
     setFormPrice(prod.priceTND || prod.price || 0);
     setFormComparePrice(prod.compareAtPriceTND || prod.compareAtPrice || 0);
-    setFormStock(prod.stock ?? 0);
+    setFormStock(isUnlimitedStock(prod.stock) ? 0 : prod.stock ?? 0);
     setFormSku(prod.sku || '');
     setFormBrand(prod.brand || prod.specs?.brand || 'Mechanic');
     setFormWarranty(prod.warranty || '6 Mois');
@@ -153,6 +202,15 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
     }
   };
 
+  const handleRemoveImage = (index: number) => {
+    const removedImage = formImages[index];
+    const remainingImages = formImages.filter((_, imageIndex) => imageIndex !== index);
+    setFormImages(remainingImages);
+    if (formImageUrl === removedImage) {
+      setFormImageUrl(remainingImages[0] ?? '');
+    }
+  };
+
   // Submit Create or Edit Product
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,8 +222,12 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
     try {
       setIsSubmitting(true);
       const slug = (formSlug || formName).toLowerCase().replace(/[^a-z0-9_-]/g, '-');
-      const fallbackImg = formImageUrl || formImages[0] || '/logo.jpg';
-      const imagesList = formImages.length > 0 ? formImages : [fallbackImg];
+      const fallbackImg = formImageUrl || formImages[0] || (editingProduct ? '' : '/logo.jpg');
+      const imagesList = editingProduct
+        ? formImages
+        : formImages.length > 0
+          ? formImages
+          : [fallbackImg];
 
       const payload = {
         name: formName.trim(),
@@ -186,19 +248,15 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
       };
 
       if (editingProduct) {
-        // Update
         const res = await api.products.update(editingProduct.id, payload);
-        if (res?.data) {
-          showToast('Produit mis à jour avec succès.', 'success');
-          setProducts((prev) => prev.map((p) => (p.id === editingProduct.id ? { ...p, ...res.data } : p)));
-        }
+        if (!res?.data) throw new Error(res?.message || 'Le serveur n’a pas renvoyé le produit mis à jour.');
+        showToast('Produit mis à jour avec succès.', 'success');
+        setProducts((prev) => prev.map((p) => (p.id === editingProduct.id ? { ...p, ...res.data } : p)));
       } else {
-        // Create
         const res = await api.products.create(payload);
-        if (res?.data) {
-          showToast('Nouveau produit créé avec succès.', 'success');
-          setProducts((prev) => [res.data, ...prev]);
-        }
+        if (!res?.data) throw new Error(res?.message || 'Le serveur n’a pas renvoyé le nouveau produit.');
+        showToast('Nouveau produit créé avec succès.', 'success');
+        setProducts((prev) => [res.data, ...prev]);
       }
 
       setIsModalOpen(false);
@@ -231,50 +289,12 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
     }
   };
 
-  // Quick update stock
-  const handleQuickStock = async (id: string, newStock: number) => {
-    if (newStock < 0) return;
-    try {
-      await api.products.patchStock(id, newStock);
-      setProducts((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, stock: newStock } : p))
-      );
-      showToast(`Stock mis à jour (${newStock} unités).`, 'success');
-      refreshProducts();
-    } catch (err: any) {
-      showToast(err.message || 'Erreur mise à jour stock.', 'error');
-    }
-  };
-
-  // Real Delete Product with Credentials & Verification
   const handleDeleteProduct = async (id: string) => {
     if (deletingId) return;
 
     try {
       setDeletingId(id);
-
-      const response = await fetch(`/api/products/${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          showToast('يجب تسجيل الدخول كمسؤول أولاً (401)', 'error');
-          navigateTo('login');
-          return;
-        }
-        if (response.status === 403) {
-          showToast('ليس لديك صلاحية حذف المنتجات (403)', 'error');
-          return;
-        }
-        throw new Error(data.message || data.error || 'فشل حذف المنتج');
-      }
+      const data = await api.products.delete(id);
 
       if (data.softDeleted) {
         setProducts((current) =>
@@ -294,10 +314,14 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
       }
 
       setProductToDelete(null);
-      fetchProducts();
       refreshProducts();
       if (onRefreshData) onRefreshData();
     } catch (error) {
+      if (typeof error === 'object' && error !== null && 'status' in error && error.status === 401) {
+        showToast('يجب تسجيل الدخول كمسؤول أولاً (401)', 'error');
+        navigateTo('login');
+        return;
+      }
       showToast(
         error instanceof Error
           ? error.message
@@ -332,12 +356,6 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
     if (statusFilter === 'inactive' && prod.isActive !== false) {
       return false;
     }
-
-    // Stock
-    const stock = prod.stock ?? 0;
-    if (stockFilter === 'in_stock' && stock <= 5) return false;
-    if (stockFilter === 'low_stock' && (stock <= 0 || stock > 5)) return false;
-    if (stockFilter === 'out_of_stock' && stock > 0) return false;
 
     return true;
   });
@@ -379,13 +397,14 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
             <span>Catalogue & Inventaire Produits ({products.length})</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Ajoutez, modifiez le stock, activez ou supprimez des produits en temps réel dans SQLite.
+            Ajoutez, modifiez, activez ou supprimez des produits en temps réel dans SQLite.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={fetchProducts}
+            aria-label="Actualiser la liste des produits"
             className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition"
             title="Actualiser la liste"
           >
@@ -402,12 +421,14 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 bg-white p-4 rounded-2xl border border-slate-200 text-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-4 rounded-2xl border border-slate-200 text-xs">
         {/* Search */}
         <div className="relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
           <input
+            id="admin-product-search"
             type="text"
+            aria-label="Rechercher des produits"
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -421,6 +442,8 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
         {/* Category Filter */}
         <div>
           <select
+            id="admin-product-category-filter"
+            aria-label="Filtrer par catégorie"
             value={categoryFilter}
             onChange={(e) => {
               setCategoryFilter(e.target.value);
@@ -440,6 +463,8 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
         {/* Status Filter (Active / Inactive / All) */}
         <div>
           <select
+            id="admin-product-status-filter"
+            aria-label="Filtrer par statut"
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value as any);
@@ -453,26 +478,11 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
           </select>
         </div>
 
-        {/* Stock Status Filter */}
-        <div>
-          <select
-            value={stockFilter}
-            onChange={(e) => {
-              setStockFilter(e.target.value as any);
-              setCurrentPage(1);
-            }}
-            className="w-full py-2.5 px-3 rounded-xl border border-slate-300 bg-white font-medium"
-          >
-            <option value="all">Tous les niveaux de stock</option>
-            <option value="in_stock">✅ En stock (&gt; 5)</option>
-            <option value="low_stock">⚠️ Stock faible (1 à 5)</option>
-            <option value="out_of_stock">❌ En rupture (0)</option>
-          </select>
-        </div>
-
         {/* Sort By */}
         <div>
           <select
+            id="admin-product-sort"
+            aria-label="Trier les produits"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
             className="w-full py-2.5 px-3 rounded-xl border border-slate-300 bg-white font-medium"
@@ -501,7 +511,6 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
               onClick={() => {
                 setSearchQuery('');
                 setCategoryFilter('all');
-                setStockFilter('all');
               }}
               className="text-xs text-orange-600 font-bold hover:underline"
             >
@@ -516,16 +525,12 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                   <th className="py-3.5 px-4 text-start">Produit</th>
                   <th className="py-3.5 px-4 text-start">Catégorie</th>
                   <th className="py-3.5 px-4 text-start">Prix (DT)</th>
-                  <th className="py-3.5 px-4 text-center">Stock</th>
                   <th className="py-3.5 px-4 text-center">Statut</th>
                   <th className="py-3.5 px-4 text-end">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {paginatedProducts.map((prod) => {
-                  const stock = prod.stock ?? 0;
-                  const isOutOfStock = stock <= 0;
-                  const isLowStock = stock > 0 && stock <= 5;
                   const isActive = prod.isActive !== false;
 
                   return (
@@ -537,6 +542,9 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                             <img
                               src={prod.image?.trim() || '/logo.jpg'}
                               alt={prod.name}
+                              loading="lazy"
+                              width={56}
+                              height={56}
                               className="w-full h-full object-contain"
                               onError={(e) => {
                                 if (e.currentTarget.src !== '/logo.jpg') e.currentTarget.src = '/logo.jpg';
@@ -580,37 +588,6 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                         ) : null}
                       </td>
 
-                      {/* Stock with quick buttons */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleQuickStock(prod.id, Math.max(0, stock - 1))}
-                            className="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition"
-                          >
-                            -
-                          </button>
-                          <span
-                            className={`px-2 py-0.5 rounded-lg text-xs font-mono font-bold ${
-                              isOutOfStock
-                                ? 'bg-rose-100 text-rose-700'
-                                : isLowStock
-                                ? 'bg-amber-100 text-amber-700'
-                                : 'bg-emerald-50 text-emerald-700'
-                            }`}
-                          >
-                            {stock}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleQuickStock(prod.id, stock + 1)}
-                            className="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </td>
-
                       {/* Status toggle & badge */}
                       <td className="py-3 px-4 text-center">
                         <button
@@ -622,6 +599,7 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                               : 'bg-rose-100 text-rose-800 hover:bg-rose-200'
                           }`}
                           title={isActive ? 'Cliquer pour masquer du magasin' : 'Cliquer pour réactiver'}
+                          aria-label={isActive ? `Masquer ${prod.name}` : `Réactiver ${prod.name}`}
                         >
                           {isActive ? (
                             <>
@@ -644,6 +622,7 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                             <button
                               type="button"
                               onClick={() => handleToggleActive(prod.id, false)}
+                              aria-label={`Réactiver ${prod.name}`}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition border border-emerald-200/60"
                               title="إعادة تفعيل هذا المنتج في المتجر"
                             >
@@ -654,6 +633,7 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(prod)}
+                            aria-label={`Modifier ${prod.name}`}
                             className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
                             title="Modifier ce produit"
                           >
@@ -663,6 +643,7 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                             type="button"
                             onClick={() => setProductToDelete(prod)}
                             disabled={deletingId === prod.id}
+                            aria-label={`Supprimer ${prod.name}`}
                             className="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition disabled:opacity-50"
                             title="Supprimer ce produit"
                           >
@@ -713,7 +694,14 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
       {/* CREATE / EDIT PRODUCT MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
+          <div
+            ref={productDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={editingProduct ? 'Modifier un produit' : 'Nouveau produit'}
+            tabIndex={-1}
+            className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]"
+          >
             {/* Modal Header */}
             <div className="p-5 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -724,6 +712,7 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
+                aria-label="Fermer la fenêtre produit"
                 className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition"
               >
                 <X className="w-5 h-5" />
@@ -734,8 +723,9 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
             <form onSubmit={handleSubmitForm} className="p-6 overflow-y-auto space-y-5 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Nom du Produit *</label>
+                  <label htmlFor="product-name" className="font-bold text-slate-700 block mb-1">Nom du Produit *</label>
                   <input
+                    id="product-name"
                     type="text"
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
@@ -746,8 +736,9 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Slug URL</label>
+                  <label htmlFor="product-slug" className="font-bold text-slate-700 block mb-1">Slug URL</label>
                   <input
+                    id="product-slug"
                     type="text"
                     value={formSlug}
                     onChange={(e) => setFormSlug(e.target.value)}
@@ -759,8 +750,9 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Catégorie *</label>
+                  <label htmlFor="product-category" className="font-bold text-slate-700 block mb-1">Catégorie *</label>
                   <select
+                    id="product-category"
                     value={formCategory}
                     onChange={(e) => setFormCategory(e.target.value)}
                     className="w-full p-2.5 rounded-xl border border-slate-300 font-medium"
@@ -775,8 +767,9 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Marque</label>
+                  <label htmlFor="product-brand" className="font-bold text-slate-700 block mb-1">Marque</label>
                   <input
+                    id="product-brand"
                     type="text"
                     value={formBrand}
                     onChange={(e) => setFormBrand(e.target.value)}
@@ -786,8 +779,9 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Garantie</label>
+                  <label htmlFor="product-warranty" className="font-bold text-slate-700 block mb-1">Garantie</label>
                   <input
+                    id="product-warranty"
                     type="text"
                     value={formWarranty}
                     onChange={(e) => setFormWarranty(e.target.value)}
@@ -799,8 +793,9 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Prix Vente (DT) *</label>
+                  <label htmlFor="product-price" className="font-bold text-slate-700 block mb-1">Prix Vente (DT) *</label>
                   <input
+                    id="product-price"
                     type="number"
                     step="0.5"
                     min="0"
@@ -812,8 +807,9 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Prix Barré (Promo DT)</label>
+                  <label htmlFor="product-compare-price" className="font-bold text-slate-700 block mb-1">Prix Barré (Promo DT)</label>
                   <input
+                    id="product-compare-price"
                     type="number"
                     step="0.5"
                     min="0"
@@ -824,20 +820,9 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Quantité Stock *</label>
+                  <label htmlFor="product-sku" className="font-bold text-slate-700 block mb-1">Code SKU</label>
                   <input
-                    type="number"
-                    min="0"
-                    value={formStock}
-                    onChange={(e) => setFormStock(Number(e.target.value))}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 font-mono font-bold"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Code SKU</label>
-                  <input
+                    id="product-sku"
                     type="text"
                     value={formSku}
                     onChange={(e) => setFormSku(e.target.value)}
@@ -848,8 +833,9 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Description Courte</label>
+                <label htmlFor="product-short-description" className="font-bold text-slate-700 block mb-1">Description Courte</label>
                 <input
+                  id="product-short-description"
                   type="text"
                   value={formShortDesc}
                   onChange={(e) => setFormShortDesc(e.target.value)}
@@ -859,8 +845,9 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Description Détaillée</label>
+                <label htmlFor="product-description" className="font-bold text-slate-700 block mb-1">Description Détaillée</label>
                 <textarea
+                  id="product-description"
                   rows={3}
                   value={formDesc}
                   onChange={(e) => setFormDesc(e.target.value)}
@@ -877,6 +864,9 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                     <img
                       src={formImageUrl?.trim() || '/logo.jpg'}
                       alt="Preview"
+                      loading="lazy"
+                      width={160}
+                      height={160}
                       className="w-full h-full object-contain"
                       onError={(e) => {
                         if (e.currentTarget.src !== '/logo.jpg') e.currentTarget.src = '/logo.jpg';
@@ -886,6 +876,7 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                   <div className="space-y-2 flex-1">
                     <input
                       type="file"
+                      aria-label="Sélectionner une photo de produit"
                       ref={fileInputRef}
                       onChange={handleUploadImage}
                       accept="image/*"
@@ -900,7 +891,9 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                       <Upload className="w-3.5 h-3.5" />
                       <span>{isUploading ? 'Téléversement...' : 'Téléverser une image'}</span>
                     </button>
+                    <label htmlFor="product-image-url" className="sr-only">URL de l’image du produit</label>
                     <input
+                      id="product-image-url"
                       type="text"
                       value={formImageUrl}
                       onChange={(e) => setFormImageUrl(e.target.value)}
@@ -909,6 +902,31 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                     />
                   </div>
                 </div>
+                {formImages.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {formImages.map((image, index) => (
+                      <div key={`${image}-${index}`} className="relative h-16 w-16 rounded-lg border border-slate-300 bg-white p-1">
+                        <img
+                          src={image}
+                          alt=""
+                          loading="lazy"
+                          className="h-full w-full rounded object-contain"
+                          onError={(e) => {
+                            if (e.currentTarget.src !== '/logo.jpg') e.currentTarget.src = '/logo.jpg';
+                          }}
+                        />
+                        <button
+                          type="button"
+                          aria-label={`Supprimer l’image ${index + 1}`}
+                          onClick={() => handleRemoveImage(index)}
+                          className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-white shadow hover:bg-rose-700"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Status & Featured Checkboxes */}
@@ -966,7 +984,14 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
       {/* CONFIRMATION MODAL BEFORE DELETION */}
       {productToDelete && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+          <div
+            ref={deleteDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirmer la suppression du produit"
+            tabIndex={-1}
+            className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-150"
+          >
             <div className="flex items-start gap-3">
               <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 flex-shrink-0">
                 <AlertTriangle className="w-6 h-6" />
@@ -987,6 +1012,9 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({ onRefreshDat
                 <img
                   src={productToDelete.image?.trim() || '/logo.jpg'}
                   alt={productToDelete.name}
+                  loading="lazy"
+                  width={64}
+                  height={64}
                   className="w-full h-full object-contain"
                   onError={(e) => {
                     if (e.currentTarget.src !== '/logo.jpg') e.currentTarget.src = '/logo.jpg';

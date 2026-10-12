@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useStore } from '../context/StoreContext';
+import { useStoreRouting, useStoreSettings } from '../context/StoreSlices';
 import { api } from '../services/api';
 import {
   PackageSearch,
@@ -14,7 +14,8 @@ import {
 } from 'lucide-react';
 
 export const TrackOrderPage: React.FC = () => {
-  const { t, formatPrice, routeParams } = useStore();
+  const { t, formatPrice, settings } = useStoreSettings();
+  const { routeParams } = useStoreRouting();
   const [searchNumber, setSearchNumber] = useState(routeParams.orderNumber || '');
   const [order, setOrder] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -83,7 +84,9 @@ export const TrackOrderPage: React.FC = () => {
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
           <input
+            id="track-order-number"
             type="text"
+            aria-label={t.trackOrderTitle}
             value={searchNumber}
             onChange={(e) => setSearchNumber(e.target.value)}
             placeholder="Exemple : GSM-TN-2024-1082"
@@ -222,7 +225,7 @@ export const TrackOrderPage: React.FC = () => {
           <AlertCircle className="w-10 h-10 text-rose-500 mx-auto" />
           <h3 className="text-sm font-bold text-slate-900">{errorMsg}</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Vérifiez l’orthographe du numéro de commande ou appelez notre service client au +216 26 383 876.
+            Vérifiez l’orthographe du numéro de commande ou appelez notre service client au {settings.phone}.
           </p>
         </div>
       )}

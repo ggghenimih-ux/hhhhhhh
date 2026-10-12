@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
+import { useAuth } from '../context/AuthContext';
+import { isAvailable, MAX_ORDER_QUANTITY } from '../utils/stock';
 import { api } from '../services/api';
 import { Product, Review } from '../types';
 import { getSafeImageUrl, handleImageError } from '../utils/image';
+import { setMetaContent, setProductStructuredData } from '../utils/seo';
 import {
   Star,
   ShoppingCart,
@@ -11,17 +14,18 @@ import {
   Truck,
   RotateCcw,
   Phone,
-  CheckCircle2,
-  AlertTriangle,
   Minus,
   Plus,
   Send,
   Share2,
   ChevronRight,
   ArrowLeft,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 
 export const ProductDetailPage: React.FC = () => {
+  const { user } = useAuth();
   const {
     t,
     language,
@@ -36,6 +40,7 @@ export const ProductDetailPage: React.FC = () => {
     isInWishlist,
     products,
     showToast,
+    settings,
   } = useStore();
 
   const [product, setProduct] = useState<Product | null>(null);
@@ -49,6 +54,39 @@ export const ProductDetailPage: React.FC = () => {
   const [reviewerRating, setReviewerRating] = useState(5);
   const [reviewerComment, setReviewerComment] = useState('');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  useEffect(() => {
+    if (!product) return;
+    const name = getLocalizedName(product);
+    const description = getLocalizedDesc(product);
+    const image = getSafeImageUrl(product.image);
+    const title = `${name} | ${settings.storeName}`;
+    document.title = title;
+    setMetaContent('meta[name="description"]', 'name', 'description', description);
+    setMetaContent('meta[property="og:title"]', 'property', 'og:title', title);
+    setMetaContent('meta[property="og:description"]', 'property', 'og:description', description);
+    setMetaContent('meta[property="og:type"]', 'property', 'og:type', 'product');
+    setMetaContent('meta[property="og:image"]', 'property', 'og:image', image);
+    setMetaContent('meta[property="og:url"]', 'property', 'og:url', window.location.href);
+    setProductStructuredData({
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name,
+      description,
+      image,
+      sku: product.id,
+      offers: {
+        '@type': 'Offer',
+        priceCurrency: 'TND',
+        price: getProductPrice(product),
+        availability: isAvailable(product.stock)
+          ? 'https://schema.org/InStock'
+          : 'https://schema.org/OutOfStock',
+        url: window.location.href,
+      },
+    });
+    return () => setProductStructuredData(null);
+  }, [product, getLocalizedName, getLocalizedDesc, getProductPrice, settings.storeName]);
 
   // Fetch product from backend
   useEffect(() => {
@@ -112,9 +150,6 @@ export const ProductDetailPage: React.FC = () => {
   const price = getProductPrice(product);
   const comparePrice = product.compareAtPriceTND || product.originalPrice;
   const isFavorited = isInWishlist(product.id);
-  const currentStock = product.stock ?? 0;
-  const isOutOfStock = currentStock <= 0;
-
   const imagesList = Array.isArray(product.images) && product.images.length > 0
     ? product.images
     : [product.image];
@@ -189,6 +224,9 @@ export const ProductDetailPage: React.FC = () => {
             <img
               src={mainImage}
               alt={name}
+              loading="lazy"
+              width={800}
+              height={800}
               onError={(e) => handleImageError(e)}
               className="w-full h-full object-cover"
             />
@@ -206,6 +244,7 @@ export const ProductDetailPage: React.FC = () => {
                 <button
                   key={idx}
                   onClick={() => setSelectedImageIndex(idx)}
+                  aria-label={language === 'ar' ? `عرض الصورة ${idx + 1}` : `Afficher l’image ${idx + 1}`}
                   className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition flex-shrink-0 ${
                     selectedImageIndex === idx
                       ? 'border-orange-600 ring-2 ring-orange-500/20'
@@ -215,6 +254,9 @@ export const ProductDetailPage: React.FC = () => {
                   <img
                     src={getSafeImageUrl(img)}
                     alt=""
+                    loading="lazy"
+                    width={64}
+                    height={64}
                     onError={(e) => handleImageError(e)}
                     className="w-full h-full object-cover"
                   />
@@ -239,12 +281,12 @@ export const ProductDetailPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
               <Phone className="w-4 h-4 text-amber-600 flex-shrink-0" />
-              <span>Hotline +216 26 383 876</span>
+              <span>Hotline {settings.phone}</span>
             </div>
           </div>
         </div>
 
-        {/* Right: Pricing, Stock & Actions */}
+        {/* Right: Pricing & Actions */}
         <div className="flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
@@ -305,20 +347,6 @@ export const ProductDetailPage: React.FC = () => {
               {description}
             </p>
 
-            {/* Stock Alert */}
-            <div className="mb-6">
-              {!isOutOfStock ? (
-                <div className="inline-flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>En Stock : {currentStock} pièces prêtes à l’envoi</span>
-                </div>
-              ) : (
-                <div className="inline-flex items-center gap-2 text-xs font-bold text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>Rupture de Stock temporaire</span>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Action Row */}
@@ -328,6 +356,7 @@ export const ProductDetailPage: React.FC = () => {
               <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50 p-1">
                 <button
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  aria-label={language === 'ar' ? 'إنقاص الكمية' : 'Diminuer la quantité'}
                   className="p-2 rounded-lg hover:bg-white text-slate-600 transition"
                   disabled={quantity <= 1}
                 >
@@ -337,9 +366,10 @@ export const ProductDetailPage: React.FC = () => {
                   {quantity}
                 </span>
                 <button
-                  onClick={() => setQuantity((q) => Math.min(currentStock, q + 1))}
+                  onClick={() => setQuantity((q) => Math.min(MAX_ORDER_QUANTITY, q + 1))}
+                  aria-label={language === 'ar' ? 'زيادة الكمية' : 'Augmenter la quantité'}
                   className="p-2 rounded-lg hover:bg-white text-slate-600 transition"
-                  disabled={quantity >= currentStock}
+                  disabled={quantity >= MAX_ORDER_QUANTITY}
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -348,11 +378,10 @@ export const ProductDetailPage: React.FC = () => {
               {/* Add to cart */}
               <button
                 onClick={handleAddToCart}
-                disabled={isOutOfStock}
-                className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl text-xs sm:text-sm font-bold bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-600/30 transition disabled:bg-slate-200 disabled:text-slate-400"
+                className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl text-xs sm:text-sm font-bold bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-600/30 transition"
               >
                 <ShoppingCart className="w-4 h-4" />
-                <span>{isOutOfStock ? t.outOfStock : t.addToCart}</span>
+                <span>{t.addToCart}</span>
               </button>
 
               {/* Wishlist */}
@@ -364,18 +393,40 @@ export const ProductDetailPage: React.FC = () => {
                     : 'border-slate-200 text-slate-600 hover:border-slate-300'
                 }`}
                 title={t.addToWishlist}
+                aria-label={isFavorited ? 'Retirer des favoris' : 'Ajouter aux favoris'}
               >
                 <Heart className={`w-5 h-5 ${isFavorited ? 'fill-rose-500 text-rose-500' : ''}`} />
               </button>
             </div>
 
             <a
-              href="tel:+21626383876"
+              href={`tel:${settings.phone.replace(/[\s\-\(\)]/g, '')}`}
               className="flex items-center justify-center gap-2 py-2 text-xs font-semibold text-slate-600 hover:text-orange-600 transition"
             >
               <Phone className="w-3.5 h-3.5 text-orange-500" />
-              <span>Commander par téléphone au +216 26 383 876 </span>
+              <span>Commander par téléphone au {settings.phone} </span>
             </a>
+
+            {user?.role === 'ADMIN' && (
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => navigateTo('admin-products', { productId: product.id, productAction: 'edit' })}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                >
+                  <Edit2 className="h-4 w-4" />
+                  Modifier le produit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigateTo('admin-products', { productId: product.id, productAction: 'delete' })}
+                  className="inline-flex items-center gap-2 rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Supprimer le produit
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -442,8 +493,8 @@ export const ProductDetailPage: React.FC = () => {
             <h4 className="font-bold text-slate-900 text-sm">Garantie & Support Réparation GSM :</h4>
             <ul className="list-disc pl-5 space-y-1.5 text-xs text-slate-600">
               <li>Testé et calibré avant expédition pour garantir un fonctionnement optimal.</li>
-              <li>Pièces de rechange et accessoires disponibles en stock chez Outils Réparation GSM Tunisie.</li>
-              <li>Support technique assuré par des techniciens expérimentés au +216 26 383 876.</li>
+              <li>Pièces de rechange et accessoires sélectionnés par Outils Réparation GSM Tunisie.</li>
+              <li>Support technique assuré par des techniciens expérimentés au {settings.phone}.</li>
             </ul>
           </div>
         )}
@@ -492,10 +543,11 @@ export const ProductDetailPage: React.FC = () => {
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  <label htmlFor="reviewer-name" className="text-xs font-semibold text-slate-700 block mb-1">
                     Votre Nom ou Atelier *
                   </label>
                   <input
+                    id="reviewer-name"
                     type="text"
                     value={reviewerName}
                     onChange={(e) => setReviewerName(e.target.value)}
@@ -505,10 +557,11 @@ export const ProductDetailPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  <label htmlFor="reviewer-rating" className="text-xs font-semibold text-slate-700 block mb-1">
                     Note *
                   </label>
                   <select
+                    id="reviewer-rating"
                     value={reviewerRating}
                     onChange={(e) => setReviewerRating(Number(e.target.value))}
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-200 outline-none focus:border-orange-500 bg-white"
@@ -521,10 +574,11 @@ export const ProductDetailPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                <label htmlFor="reviewer-comment" className="text-xs font-semibold text-slate-700 block mb-1">
                   Votre Commentaire *
                 </label>
                 <textarea
+                  id="reviewer-comment"
                   rows={3}
                   value={reviewerComment}
                   onChange={(e) => setReviewerComment(e.target.value)}
@@ -563,6 +617,9 @@ export const ProductDetailPage: React.FC = () => {
                 <img
                   src={getSafeImageUrl(p.image)}
                   alt=""
+                  loading="lazy"
+                  width={56}
+                  height={56}
                   onError={(e) => handleImageError(e)}
                   className="w-14 h-14 object-cover rounded-xl border border-slate-100 flex-shrink-0"
                 />

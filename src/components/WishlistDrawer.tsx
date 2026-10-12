@@ -1,6 +1,7 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { getSafeImageUrl, handleImageError } from '../utils/image';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 import {
   X,
   Heart,
@@ -23,8 +24,9 @@ export const WishlistDrawer: React.FC = () => {
     addToCart,
     isWishlistDrawerOpen,
     setIsWishlistDrawerOpen,
-    setDetailProduct
+    navigateTo,
   } = useStore();
+  const dialogRef = useDialogAccessibility(isWishlistDrawerOpen, () => setIsWishlistDrawerOpen(false));
 
   if (!isWishlistDrawerOpen) return null;
 
@@ -39,7 +41,14 @@ export const WishlistDrawer: React.FC = () => {
       />
 
       <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col justify-between border-l border-slate-200">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={t.wishlist}
+          tabIndex={-1}
+          className="w-screen max-w-md bg-white shadow-2xl flex flex-col justify-between border-l border-slate-200"
+        >
           {/* Header */}
           <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -57,6 +66,7 @@ export const WishlistDrawer: React.FC = () => {
             </div>
             <button
               onClick={() => setIsWishlistDrawerOpen(false)}
+              aria-label={language === 'ar' ? 'إغلاق المفضلة' : 'Fermer les favoris'}
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
             >
               <X className="w-5 h-5" />
@@ -92,10 +102,13 @@ export const WishlistDrawer: React.FC = () => {
                     <img
                       src={getSafeImageUrl(product.images?.[0] || product.image)}
                       alt={name}
+                      loading="lazy"
+                      width={64}
+                      height={64}
                       onError={(e) => handleImageError(e)}
                       onClick={() => {
                         setIsWishlistDrawerOpen(false);
-                        setDetailProduct(product);
+                        navigateTo('product-detail', { productSlug: product.slug, productId: product.id });
                       }}
                       className="w-16 h-16 rounded-xl object-cover border border-slate-200 cursor-pointer flex-shrink-0"
                     />
@@ -104,7 +117,7 @@ export const WishlistDrawer: React.FC = () => {
                       <h4
                         onClick={() => {
                           setIsWishlistDrawerOpen(false);
-                          setDetailProduct(product);
+                          navigateTo('product-detail', { productSlug: product.slug, productId: product.id });
                         }}
                         className="text-xs font-bold text-slate-900 line-clamp-1 cursor-pointer hover:text-orange-600 transition"
                       >
@@ -123,9 +136,9 @@ export const WishlistDrawer: React.FC = () => {
                         onClick={() => {
                           addToCart(product, 1);
                         }}
-                        disabled={product.stock <= 0}
-                        className="p-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition disabled:bg-slate-200"
+                        className="p-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition"
                         title={t.addToCart}
+                        aria-label={`${t.addToCart}: ${name}`}
                       >
                         <ShoppingCart className="w-4 h-4" />
                       </button>
@@ -133,6 +146,7 @@ export const WishlistDrawer: React.FC = () => {
                         onClick={() => toggleWishlist(product.id)}
                         className="p-2 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-100 transition"
                         title="Supprimer des favoris"
+                        aria-label={`${language === 'ar' ? 'إزالة' : 'Retirer'} ${name} ${language === 'ar' ? 'من المفضلة' : 'des favoris'}`}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

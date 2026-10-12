@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export const OrderSuccessPage: React.FC = () => {
-  const { t, formatPrice, lastPlacedOrder, routeParams, navigateTo } = useStore();
+  const { t, formatPrice, lastPlacedOrder, routeParams, navigateTo, settings } = useStore();
   const [order, setOrder] = useState<Order | null>(lastPlacedOrder);
   const [isLoading, setIsLoading] = useState(!lastPlacedOrder);
 
@@ -139,6 +139,12 @@ export const OrderSuccessPage: React.FC = () => {
                 : formatPrice(order.shippingTND ?? order.shippingCost)}
             </strong>
           </div>
+          {order.discountAmount ? (
+            <div className="flex justify-between text-emerald-700">
+              <span>Réduction {order.couponCode ? `(${order.couponCode})` : ''}</span>
+              <strong>-{formatPrice(order.discountAmount)}</strong>
+            </div>
+          ) : null}
           <div className="flex justify-between text-base font-black text-slate-900 pt-2 border-t border-slate-200">
             <span>{t.total} à régler</span>
             <span className="text-orange-600">{formatPrice(order.totalTND ?? order.totalPrice)}</span>
@@ -151,7 +157,7 @@ export const OrderSuccessPage: React.FC = () => {
           <div>
             <strong>Support commercial & logistique :</strong>
             <p className="text-[11px] text-amber-800">
-              Pour toute question, contactez notre équipe au <strong>+216 26 383 876</strong> (Mardi - Dimanche 08:00 - 16:00).
+              Pour toute question, contactez notre équipe au <strong>{settings.phone}</strong> (Mardi - Dimanche 08:00 - 16:00).
             </p>
           </div>
         </div>

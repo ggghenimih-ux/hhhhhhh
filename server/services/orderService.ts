@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { prisma } from '../db/client';
+import { TRACK_STOCK } from '../config/stock';
 
 export interface CreateOrderParams {
   userId?: string;
@@ -10,6 +11,7 @@ export interface CreateOrderParams {
   delegation?: string | null;
   address: string;
   notes?: string | null;
+  couponCode?: string | null;
   paymentMethod: string;
   items: Array<{
     productId: string;
@@ -17,9 +19,16 @@ export interface CreateOrderParams {
   }>;
 }
 
-export function calculateShipping(subtotal: number): number {
-  const threshold = Number(process.env.FREE_SHIPPING_THRESHOLD_TND) || 300.0;
-  const standardFee = Number(process.env.DEFAULT_SHIPPING_TND) || 7.0;
+export function calculateShipping(
+  subtotal: number,
+  settings?: { freeShippingThresholdTND: number; defaultShippingTND: number } | null,
+): number {
+  const threshold =
+    settings?.freeShippingThresholdTND ??
+    (Number(process.env.FREE_SHIPPING_THRESHOLD_TND) || 300.0);
+  const standardFee =
+    settings?.defaultShippingTND ??
+    (Number(process.env.DEFAULT_SHIPPING_TND) || 7.0);
   return subtotal >= threshold ? 0.0 : standardFee;
 }
 
@@ -30,6 +39,14 @@ export function generateOrderNumber(): string {
 }
 
 export async function processOrderCreation(params: CreateOrderParams) {
+  const couponCode = params.couponCode?.trim().toUpperCase() || null;
+  if (couponCode && couponCode !== 'GSM10') {
+    throw {
+      status: 400,
+      message: 'Code promo invalide.',
+    };
+  }
+
   // 1. Fetch all products from DB using their IDs
   const productIds = params.items.map((i) => i.productId);
   const products = await prisma.product.findMany({
@@ -48,7 +65,7 @@ export async function processOrderCreation(params: CreateOrderParams) {
     };
   }
 
-  // 2. Map and check stock availability for every requested item
+  // 2. Check availability only when inventory tracking is enabled
   const productMap = new Map(products.map((p) => [p.id, p]));
   const orderItemsData: Array<{
     productId: string;
@@ -63,7 +80,7 @@ export async function processOrderCreation(params: CreateOrderParams) {
   for (const item of params.items) {
     const product = productMap.get(item.productId)!;
 
-    if (product.stock < item.quantity) {
+    if (TRACK_STOCK && product.stock < item.quantity) {
       throw {
         status: 400,
         message: `Stock insuffisant pour « ${product.name} ». Stock restant : ${product.stock} unité(s).`,
@@ -83,25 +100,37 @@ export async function processOrderCreation(params: CreateOrderParams) {
   }
 
   subtotalTND = Math.round(subtotalTND * 1000) / 1000;
-  const shippingTND = calculateShipping(subtotalTND);
-  const totalTND = Math.round((subtotalTND + shippingTND) * 1000) / 1000;
+  const settings = await prisma.storeSettings.findUnique({
+    where: { id: 'default' },
+    select: {
+      defaultShippingTND: true,
+      freeShippingThresholdTND: true,
+    },
+  });
+  const shippingTND = calculateShipping(subtotalTND, settings);
+  const discountAmount = couponCode
+    ? Math.round(subtotalTND * 0.1 * 1000) / 1000
+    : 0;
+  const totalTND = Math.round((subtotalTND - discountAmount + shippingTND) * 1000) / 1000;
   const orderNumber = generateOrderNumber();
 
-  // 3. Execute atomic transaction to reserve/decrement stock and persist Order & Items
+  // 3. Persist the order atomically; reserve stock only when inventory tracking is enabled
   const createdOrder = await prisma.$transaction(async (tx) => {
-    // Decrement stock for each item safely
-    for (const item of params.items) {
-      const updated = await tx.product.update({
-        where: { id: item.productId },
-        data: {
-          stock: {
-            decrement: item.quantity,
+    // Decrement stock for each item safely when inventory tracking is enabled
+    if (TRACK_STOCK) {
+      for (const item of params.items) {
+        const updated = await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            stock: {
+              decrement: item.quantity,
+            },
           },
-        },
-      });
+        });
 
-      if (updated.stock < 0) {
-        throw new Error(`Concurrence de stock détectée pour ${updated.name}`);
+        if (updated.stock < 0) {
+          throw new Error(`Concurrence de stock détectée pour ${updated.name}`);
+        }
       }
     }
 
@@ -135,5 +164,9 @@ export async function processOrderCreation(params: CreateOrderParams) {
     return order;
   });
 
-  return createdOrder;
+  return {
+    ...createdOrder,
+    couponCode,
+    discountAmount,
+  };
 }

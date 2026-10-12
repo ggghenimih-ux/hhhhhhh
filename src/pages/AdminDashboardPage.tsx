@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import { api } from '../services/api';
 import { AdminOverviewTab } from '../components/admin/AdminOverviewTab';
@@ -7,6 +8,8 @@ import { AdminProductsTab } from '../components/admin/AdminProductsTab';
 import { AdminCategoriesTab } from '../components/admin/AdminCategoriesTab';
 import { AdminOrdersTab } from '../components/admin/AdminOrdersTab';
 import { AdminMediaTab } from '../components/admin/AdminMediaTab';
+import { AdminUsersTab } from '../components/admin/AdminUsersTab';
+import AdminOrderNotifier from '../components/AdminOrderNotifier';
 import {
   ShieldCheck,
   LayoutDashboard,
@@ -18,12 +21,14 @@ import {
   RefreshCw,
   LogOut,
   ExternalLink,
+  Users,
 } from 'lucide-react';
 
 export const AdminDashboardPage: React.FC = () => {
-  const { user, currentRoute, navigateTo, showToast, logout } = useStore();
+  const { user, logout } = useAuth();
+  const { currentRoute, routeParams, navigateTo } = useStore();
 
-  type TabType = 'overview' | 'settings' | 'products' | 'categories' | 'orders' | 'media';
+  type TabType = 'overview' | 'settings' | 'products' | 'categories' | 'orders' | 'users' | 'media';
 
   // Determine active tab from route
   const getInitialTab = (): TabType => {
@@ -31,6 +36,8 @@ export const AdminDashboardPage: React.FC = () => {
     if (currentRoute === 'admin-products') return 'products';
     if (currentRoute === 'admin-categories') return 'categories';
     if (currentRoute === 'admin-orders') return 'orders';
+    if (currentRoute === 'admin-users') return 'users';
+    if (currentRoute === 'admin-media') return 'media';
     return 'overview';
   };
 
@@ -39,17 +46,24 @@ export const AdminDashboardPage: React.FC = () => {
     totalOrders: number;
     totalRevenue: number;
     totalProducts: number;
+    catalogProducts?: number;
+    totalCategories?: number;
+    deliveredOrders?: number;
     lowStockProducts: number;
     recentOrders?: any[];
   }>({
     totalOrders: 0,
     totalRevenue: 0,
     totalProducts: 0,
+    catalogProducts: 0,
+    totalCategories: 0,
+    deliveredOrders: 0,
     lowStockProducts: 0,
     recentOrders: [],
   });
 
   const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [pendingOrderCount, setPendingOrderCount] = useState(0);
 
   // Sync activeTab when currentRoute changes
   useEffect(() => {
@@ -57,6 +71,8 @@ export const AdminDashboardPage: React.FC = () => {
     else if (currentRoute === 'admin-products') setActiveTab('products');
     else if (currentRoute === 'admin-categories') setActiveTab('categories');
     else if (currentRoute === 'admin-orders') setActiveTab('orders');
+    else if (currentRoute === 'admin-users') setActiveTab('users');
+    else if (currentRoute === 'admin-media') setActiveTab('media');
     else if (currentRoute === 'admin') setActiveTab('overview');
   }, [currentRoute]);
 
@@ -95,6 +111,12 @@ export const AdminDashboardPage: React.FC = () => {
         break;
       case 'orders':
         navigateTo('admin-orders');
+        break;
+      case 'users':
+        navigateTo('admin-users');
+        break;
+      case 'media':
+        navigateTo('admin-media');
         break;
       case 'overview':
       default:
@@ -150,6 +172,11 @@ export const AdminDashboardPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+          <AdminOrderNotifier
+            onOpenOrder={() => handleTabChange('orders')}
+            onPendingChange={setPendingOrderCount}
+          />
+
           <button
             onClick={() => navigateTo('home')}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
@@ -170,7 +197,10 @@ export const AdminDashboardPage: React.FC = () => {
           </button>
 
           <button
-            onClick={logout}
+            onClick={async () => {
+              await logout();
+              navigateTo('home');
+            }}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 text-xs font-bold transition"
             title="Déconnexion"
           >
@@ -239,7 +269,24 @@ export const AdminDashboardPage: React.FC = () => {
           }`}
         >
           <ShoppingCart className="w-4 h-4" />
-          <span>Commandes ({stats.totalOrders})</span>
+          <span>Commandes</span>
+          {pendingOrderCount > 0 && (
+            <span className="min-w-5 rounded-full bg-rose-500 px-1.5 py-0.5 text-center text-[10px] text-white">
+              {pendingOrderCount > 99 ? '99+' : pendingOrderCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => handleTabChange('users')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition flex-shrink-0 ${
+            activeTab === 'users'
+              ? 'bg-slate-900 text-white shadow-md'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Utilisateurs</span>
         </button>
 
         <button
@@ -268,7 +315,12 @@ export const AdminDashboardPage: React.FC = () => {
         {activeTab === 'settings' && <AdminSettingsTab />}
 
         {activeTab === 'products' && (
-          <AdminProductsTab onRefreshData={loadStats} />
+          <AdminProductsTab
+            onRefreshData={loadStats}
+            initialProductId={routeParams.productId}
+            initialProductAction={routeParams.productAction}
+            onInitialActionHandled={() => navigateTo('admin-products')}
+          />
         )}
 
         {activeTab === 'categories' && (
@@ -278,6 +330,8 @@ export const AdminDashboardPage: React.FC = () => {
         {activeTab === 'orders' && (
           <AdminOrdersTab onRefreshData={loadStats} />
         )}
+
+        {activeTab === 'users' && <AdminUsersTab />}
 
         {activeTab === 'media' && <AdminMediaTab />}
       </div>

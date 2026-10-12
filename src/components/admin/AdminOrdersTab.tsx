@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { api } from '../../services/api';
 import { AdminInvoiceModal } from './AdminInvoiceModal';
+import { AdminOrderArchiveSection } from './AdminOrderArchiveSection';
+import { useDialogAccessibility } from '../../hooks/useDialogAccessibility';
 import {
   ShoppingCart,
   Search,
   Printer,
-  Trash2,
   RefreshCw,
   Phone,
   MessageCircle,
@@ -17,6 +18,9 @@ import {
   AlertCircle,
   DollarSign,
   ChevronDown,
+  Edit2,
+  Trash2,
+  X,
 } from 'lucide-react';
 
 interface AdminOrdersTabProps {
@@ -35,6 +39,21 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
 
   // Invoice Print Modal
   const [invoiceOrder, setInvoiceOrder] = useState<any | null>(null);
+  const [editingOrder, setEditingOrder] = useState<any | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<any | null>(null);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
+  const [orderForm, setOrderForm] = useState({
+    customerName: '',
+    customerPhone: '',
+    customerEmail: '',
+    governorate: '',
+    delegation: '',
+    address: '',
+    notes: '',
+  });
+  const editDialogRef = useDialogAccessibility(Boolean(editingOrder), () => setEditingOrder(null));
+  const deleteDialogRef = useDialogAccessibility(Boolean(orderToDelete), () => setOrderToDelete(null));
 
   const fetchOrders = async () => {
     try {
@@ -76,17 +95,58 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
     }
   };
 
-  // Delete Order handler
-  const handleDeleteOrder = async (orderId: string, orderNumber: string) => {
-    if (!confirm(`Supprimer définitivement la commande #${orderNumber} ?`)) return;
+  const openOrderEdit = (order: any) => {
+    setOrderForm({
+      customerName: order.customerName || '',
+      customerPhone: order.customerPhone || '',
+      customerEmail: order.customerEmail || '',
+      governorate: order.governorate || '',
+      delegation: order.delegation || '',
+      address: order.address || '',
+      notes: order.notes || '',
+    });
+    setEditingOrder(order);
+  };
 
+  const handleSaveOrder = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingOrder || isSavingOrder) return;
     try {
-      await api.orders.delete(orderId);
-      showToast(`Commande #${orderNumber} supprimée.`, 'success');
-      setOrders((prev) => prev.filter((o) => o.id !== orderId));
-      if (onRefreshData) onRefreshData();
-    } catch (err: any) {
-      showToast(err.message || 'Erreur suppression commande.', 'error');
+      setIsSavingOrder(true);
+      const response = await api.orders.update(editingOrder.id, {
+        ...orderForm,
+        customerEmail: orderForm.customerEmail.trim() || null,
+        delegation: orderForm.delegation.trim() || null,
+        notes: orderForm.notes.trim() || null,
+      });
+      if (!response?.data) throw new Error(response?.message || 'Le serveur n’a pas renvoyé la commande modifiée.');
+      setOrders((current) => current.map((order) => order.id === editingOrder.id
+        ? { ...order, ...response.data }
+        : order));
+      setEditingOrder(null);
+      showToast('Commande mise à jour avec succès.', 'success');
+      onRefreshData?.();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Impossible de modifier cette commande.', 'error');
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
+
+  const handleDeleteOrder = async (order: any) => {
+    if (deletingOrderId) return;
+    try {
+      setDeletingOrderId(order.id);
+      const response = await api.orders.delete(order.id);
+      if (!response?.success) throw new Error(response?.message || 'La suppression de la commande a échoué.');
+      setOrders((current) => current.filter((item) => item.id !== order.id));
+      setOrderToDelete(null);
+      showToast('Commande supprimée définitivement.', 'success');
+      onRefreshData?.();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Impossible de supprimer cette commande.', 'error');
+    } finally {
+      setDeletingOrderId(null);
     }
   };
 
@@ -254,15 +314,24 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
                       <Printer className="w-3.5 h-3.5 text-orange-600" />
                       <span>Bon de Livraison</span>
                     </button>
-
-                    {/* Delete Order Button */}
                     <button
                       type="button"
-                      onClick={() => handleDeleteOrder(order.id, order.orderNumber)}
-                      className="p-1.5 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
-                      title="Supprimer la commande"
+                      onClick={() => openOrderEdit(order)}
+                      aria-label={`Modifier la commande ${order.orderNumber}`}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Edit2 className="h-3.5 w-3.5" />
+                      <span>Modifier</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOrderToDelete(order)}
+                      disabled={deletingOrderId === order.id}
+                      aria-label={`Supprimer la commande ${order.orderNumber}`}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Supprimer</span>
                     </button>
                   </div>
                 </div>
@@ -382,6 +451,124 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
           })
         )}
       </div>
+
+      <AdminOrderArchiveSection
+        onArchiveChange={() => {
+          void fetchOrders();
+          onRefreshData?.();
+        }}
+      />
+
+      {editingOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4">
+          <section
+            ref={editDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-order-title"
+            tabIndex={-1}
+            className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+          >
+            <header className="flex items-center justify-between bg-slate-900 p-5 text-white">
+              <h3 id="edit-order-title" className="text-sm font-bold">
+                Modifier la commande #{editingOrder.orderNumber}
+              </h3>
+              <button type="button" onClick={() => setEditingOrder(null)} aria-label="Fermer">
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+            <form onSubmit={handleSaveOrder} className="grid gap-4 p-5 text-xs sm:grid-cols-2">
+              <label className="space-y-1 font-semibold text-slate-700">
+                Nom du client
+                <input required minLength={2} maxLength={100} value={orderForm.customerName}
+                  onChange={(event) => setOrderForm({ ...orderForm, customerName: event.target.value })}
+                  className="w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="space-y-1 font-semibold text-slate-700">
+                Téléphone
+                <input required value={orderForm.customerPhone}
+                  onChange={(event) => setOrderForm({ ...orderForm, customerPhone: event.target.value })}
+                  className="w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="space-y-1 font-semibold text-slate-700">
+                E-mail
+                <input type="email" value={orderForm.customerEmail}
+                  onChange={(event) => setOrderForm({ ...orderForm, customerEmail: event.target.value })}
+                  className="w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="space-y-1 font-semibold text-slate-700">
+                Gouvernorat
+                <input required minLength={2} maxLength={60} value={orderForm.governorate}
+                  onChange={(event) => setOrderForm({ ...orderForm, governorate: event.target.value })}
+                  className="w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="space-y-1 font-semibold text-slate-700">
+                Délégation
+                <input maxLength={100} value={orderForm.delegation}
+                  onChange={(event) => setOrderForm({ ...orderForm, delegation: event.target.value })}
+                  className="w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="space-y-1 font-semibold text-slate-700 sm:col-span-2">
+                Adresse
+                <input required minLength={5} maxLength={500} value={orderForm.address}
+                  onChange={(event) => setOrderForm({ ...orderForm, address: event.target.value })}
+                  className="w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="space-y-1 font-semibold text-slate-700 sm:col-span-2">
+                Notes
+                <textarea maxLength={1000} value={orderForm.notes}
+                  onChange={(event) => setOrderForm({ ...orderForm, notes: event.target.value })}
+                  className="w-full rounded-lg border border-slate-300 p-2.5" rows={3} />
+              </label>
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4 sm:col-span-2">
+                <button type="button" onClick={() => setEditingOrder(null)} disabled={isSavingOrder}
+                  className="rounded-lg border border-slate-300 px-4 py-2 font-bold text-slate-600 disabled:opacity-50">
+                  Annuler
+                </button>
+                <button type="submit" disabled={isSavingOrder}
+                  className="rounded-lg bg-orange-600 px-4 py-2 font-bold text-white disabled:opacity-50">
+                  {isSavingOrder ? 'Enregistrement…' : 'Enregistrer'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {orderToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+          <section
+            ref={deleteDialogRef}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-order-title"
+            tabIndex={-1}
+            className="w-full max-w-md space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
+          >
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-6 w-6 shrink-0 text-rose-600" />
+              <div>
+                <h3 id="delete-order-title" className="font-bold text-slate-900">Supprimer la commande ?</h3>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                  La commande #{orderToDelete.orderNumber} et ses lignes seront supprimées définitivement.
+                  Cette action ne peut pas être annulée.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setOrderToDelete(null)} disabled={deletingOrderId !== null}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 disabled:opacity-50">
+                Annuler
+              </button>
+              <button type="button" onClick={() => void handleDeleteOrder(orderToDelete)}
+                disabled={deletingOrderId !== null}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                {deletingOrderId === orderToDelete.id ? 'Suppression…' : 'Confirmer la suppression'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* Printable Invoice Modal */}
       {invoiceOrder && (

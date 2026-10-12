@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
-import { useStore } from '../context/StoreContext';
+import {
+  useStoreCart,
+  useStoreNotifications,
+  useStoreProducts,
+  useStoreRouting,
+  useStoreSettings,
+} from '../context/StoreSlices';
 import { getSafeImageUrl, handleImageError } from '../utils/image';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
+import { MAX_ORDER_QUANTITY } from '../utils/stock';
 import {
   X,
   ShoppingCart,
@@ -13,55 +21,52 @@ import {
   Tag,
   ShieldCheck
 } from 'lucide-react';
-import { CONFIG } from '../../server/config';
 
 export const CartDrawer: React.FC = () => {
+  const { t, language, formatPrice } = useStoreSettings();
+  const { getLocalizedName, getProductPrice } = useStoreProducts();
   const {
-    t,
-    language,
-    formatPrice,
-    getLocalizedName,
-    getProductPrice,
     cart,
     removeFromCart,
     updateQuantity,
     clearCart,
     cartSubtotal,
     freeShippingThreshold,
+    shippingFee,
     couponCode,
     setCouponCode,
     discountRate,
     isCartDrawerOpen,
     setIsCartDrawerOpen,
-    setIsCheckoutModalOpen,
-    showToast
-  } = useStore();
+  } = useStoreCart();
+  const { navigateTo } = useStoreRouting();
+  const { showToast } = useStoreNotifications();
 
   const [inputCoupon, setInputCoupon] = useState('');
+  const dialogRef = useDialogAccessibility(isCartDrawerOpen, () => setIsCartDrawerOpen(false));
 
   if (!isCartDrawerOpen) return null;
 
   // Shipping calculation
   const remainingForFreeShipping = Math.max(0, freeShippingThreshold - cartSubtotal);
   const isFreeShipping = cartSubtotal >= freeShippingThreshold;
-  const shippingCost = isFreeShipping || cart.length === 0 ? 0 : CONFIG.SHIPPING.standardRate;
-  const discountAmount = Math.round(cartSubtotal * discountRate);
+  const shippingCost = shippingFee;
+  const discountAmount = Math.round(cartSubtotal * discountRate * 1000) / 1000;
   const finalTotal = Math.max(0, cartSubtotal - discountAmount + shippingCost);
 
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputCoupon.trim().toUpperCase() === 'GSM10') {
       setCouponCode('GSM10');
-      showToast('Code promo GSM10 appliqué : -10% de réduction !', 'success');
       setInputCoupon('');
     } else {
-      showToast('Code promo invalide. Essayez GSM10', 'error');
+      setCouponCode(inputCoupon);
     }
   };
 
   const handleProceedToCheckout = () => {
     setIsCartDrawerOpen(false);
-    setIsCheckoutModalOpen(true);
+    navigateTo('checkout');
   };
 
   return (
@@ -74,7 +79,14 @@ export const CartDrawer: React.FC = () => {
 
       {/* Slide-over panel */}
       <div className="absolute inset-y-0 end-0 max-w-full flex ps-10">
-        <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col justify-between border-s border-slate-200">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={t.cartTitle}
+          tabIndex={-1}
+          className="w-screen max-w-md bg-white shadow-2xl flex flex-col justify-between border-s border-slate-200"
+        >
           {/* Header */}
           <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -92,6 +104,7 @@ export const CartDrawer: React.FC = () => {
             </div>
             <button
               onClick={() => setIsCartDrawerOpen(false)}
+              aria-label={language === 'ar' ? 'إغلاق السلة' : 'Fermer le panier'}
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
             >
               <X className="w-5 h-5" />
@@ -152,6 +165,9 @@ export const CartDrawer: React.FC = () => {
                     <img
                       src={getSafeImageUrl(item.product.images?.[0] || item.product.image)}
                       alt={name}
+                      loading="lazy"
+                      width={64}
+                      height={64}
                       onError={(e) => handleImageError(e)}
                       className="w-16 h-16 rounded-xl object-cover border border-slate-200 flex-shrink-0"
                     />
@@ -162,6 +178,7 @@ export const CartDrawer: React.FC = () => {
                         </h4>
                         <button
                           onClick={() => removeFromCart(item.product.id, item.selectedVariant?.id)}
+                          aria-label={`${language === 'ar' ? 'إزالة' : 'Supprimer'} ${name} ${language === 'ar' ? 'من السلة' : 'du panier'}`}
                           className="text-slate-400 hover:text-rose-500 p-0.5"
                           title="Supprimer"
                         >
@@ -180,6 +197,7 @@ export const CartDrawer: React.FC = () => {
                         <div className="flex items-center border border-slate-200 rounded-lg bg-slate-50">
                           <button
                             onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.selectedVariant?.id)}
+                            aria-label={`${language === 'ar' ? 'إنقاص كمية' : 'Diminuer la quantité de'} ${name}`}
                             className="p-1 hover:bg-white text-slate-600 rounded-l-lg"
                           >
                             <Minus className="w-3 h-3" />
@@ -189,8 +207,9 @@ export const CartDrawer: React.FC = () => {
                           </span>
                           <button
                             onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.selectedVariant?.id)}
+                            aria-label={`${language === 'ar' ? 'زيادة كمية' : 'Augmenter la quantité de'} ${name}`}
                             className="p-1 hover:bg-white text-slate-600 rounded-r-lg"
-                            disabled={item.quantity >= item.product.stock}
+                            disabled={item.quantity >= MAX_ORDER_QUANTITY}
                           >
                             <Plus className="w-3 h-3" />
                           </button>
@@ -222,7 +241,11 @@ export const CartDrawer: React.FC = () => {
               <form onSubmit={handleApplyCoupon} className="flex gap-2 mb-3">
                 <div className="relative flex-1">
                   <Tag className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
+                  <label htmlFor="cart-coupon-code" className="sr-only">
+                    {language === 'ar' ? 'رمز الخصم' : 'Code promo'}
+                  </label>
                   <input
+                    id="cart-coupon-code"
                     type="text"
                     value={inputCoupon}
                     onChange={(e) => setInputCoupon(e.target.value)}

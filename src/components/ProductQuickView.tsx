@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { getSafeImageUrl, handleImageError } from '../utils/image';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 import {
   X,
   Star,
@@ -8,12 +9,11 @@ import {
   Heart,
   ShieldCheck,
   Truck,
-  CheckCircle2,
-  AlertTriangle,
   Minus,
   Plus
 } from 'lucide-react';
 import { Variant } from '../types';
+import { MAX_ORDER_QUANTITY } from '../utils/stock';
 
 export const ProductQuickView: React.FC = () => {
   const {
@@ -28,13 +28,14 @@ export const ProductQuickView: React.FC = () => {
     addToCart,
     toggleWishlist,
     isInWishlist,
-    setDetailProduct
+    navigateTo
   } = useStore();
 
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState<Variant | undefined>(
     quickViewProduct?.variants?.[0]
   );
+  const dialogRef = useDialogAccessibility(Boolean(quickViewProduct), () => setQuickViewProduct(null));
 
   if (!quickViewProduct) return null;
 
@@ -53,15 +54,23 @@ export const ProductQuickView: React.FC = () => {
   const openFullDetail = () => {
     const p = quickViewProduct;
     setQuickViewProduct(null);
-    setDetailProduct(p);
+    navigateTo('product-detail', { productSlug: p.slug, productId: p.id });
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col md:flex-row">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={name}
+        tabIndex={-1}
+        className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col md:flex-row"
+      >
         {/* Close button */}
         <button
           onClick={() => setQuickViewProduct(null)}
+          aria-label={language === 'ar' ? 'إغلاق تفاصيل المنتج' : 'Fermer les détails du produit'}
           className="absolute top-4 right-4 z-20 p-2 rounded-full bg-white/90 hover:bg-white text-slate-500 hover:text-slate-900 shadow-md border border-slate-200 transition"
         >
           <X className="w-5 h-5" />
@@ -73,6 +82,9 @@ export const ProductQuickView: React.FC = () => {
             <img
               src={getSafeImageUrl(product.images?.[0] || product.image)}
               alt={name}
+              loading="lazy"
+              width={640}
+              height={640}
               onError={(e) => handleImageError(e)}
               className="w-full h-full object-cover"
             />
@@ -159,20 +171,6 @@ export const ProductQuickView: React.FC = () => {
               </div>
             )}
 
-            {/* Stock indicator */}
-            <div className="mb-4">
-              {product.stock > 0 ? (
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600">
-                  <CheckCircle2 className="w-4 h-4" />
-                  {t.inStock} ({product.stock} pièces en stock magasin)
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600">
-                  <AlertTriangle className="w-4 h-4" />
-                  {t.outOfStock}
-                </span>
-              )}
-            </div>
           </div>
 
           {/* Action Row */}
@@ -182,6 +180,7 @@ export const ProductQuickView: React.FC = () => {
               <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50 p-1">
                 <button
                   onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  aria-label={language === 'ar' ? 'إنقاص الكمية' : 'Diminuer la quantité'}
                   className="p-1.5 rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition"
                   disabled={quantity <= 1}
                 >
@@ -191,9 +190,10 @@ export const ProductQuickView: React.FC = () => {
                   {quantity}
                 </span>
                 <button
-                  onClick={() => setQuantity(q => Math.min(product.stock, q + 1))}
+                  onClick={() => setQuantity(q => Math.min(MAX_ORDER_QUANTITY, q + 1))}
+                  aria-label={language === 'ar' ? 'زيادة الكمية' : 'Augmenter la quantité'}
                   className="p-1.5 rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition"
-                  disabled={quantity >= product.stock}
+                  disabled={quantity >= MAX_ORDER_QUANTITY}
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
@@ -202,8 +202,7 @@ export const ProductQuickView: React.FC = () => {
               {/* Add to Cart */}
               <button
                 onClick={handleAddToCart}
-                disabled={product.stock <= 0}
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white shadow-md transition disabled:bg-slate-200 disabled:text-slate-400"
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white shadow-md transition"
               >
                 <ShoppingCart className="w-4 h-4" />
                 <span>{t.addToCart}</span>
@@ -218,6 +217,7 @@ export const ProductQuickView: React.FC = () => {
                     : 'border-slate-200 text-slate-600 hover:border-slate-300'
                 }`}
                 title={t.addToWishlist}
+                aria-label={isFavorited ? 'Retirer des favoris' : 'Ajouter aux favoris'}
               >
                 <Heart className={`w-4 h-4 ${isFavorited ? 'fill-rose-500' : ''}`} />
               </button>

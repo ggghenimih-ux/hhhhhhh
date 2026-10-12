@@ -18,25 +18,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     addToCart,
     toggleWishlist,
     isInWishlist,
-    setDetailProduct,
+    navigateTo,
   } = useStore();
 
   const isFavorited = isInWishlist(product.id);
   const name = getLocalizedName(product);
   const price = getProductPrice(product);
   const originalPrice = product.compareAtPriceTND || product.originalPrice;
-  const isOutOfStock = product.stock <= 0;
   const image = getSafeImageUrl(product.images?.[0] || product.image);
 
   const handleCardClick = () => {
-    setDetailProduct(product);
+    navigateTo('product-detail', { productSlug: product.slug, productId: product.id });
   };
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isOutOfStock) {
-      addToCart(product, 1);
-    }
+    addToCart(product, 1);
   };
 
   const handleWishlist = (e: React.MouseEvent) => {
@@ -57,6 +54,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           src={image}
           alt={name}
           loading="lazy"
+          width={480}
+          height={480}
           onError={(e) => handleImageError(e)}
           className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
         />
@@ -112,7 +111,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </div>
         </div>
 
-        {/* 5. Price & 6. Stock Status */}
+        {/* 5. Price */}
         <div className="pt-3 mt-2 border-t border-slate-100 space-y-1">
           <div className="flex items-baseline gap-2 flex-wrap">
             <span className="text-base sm:text-lg font-black text-slate-900">
@@ -124,21 +123,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               </span>
             )}
           </div>
-
-          {/* 6. Stock Status (Clean unboxed indicator) */}
-          <div className="text-[11px] font-medium">
-            {isOutOfStock ? (
-              <span className="text-slate-400 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-300 inline-block" />
-                <span>{language === 'ar' ? 'غير متوفر حالياً' : 'Rupture de stock'}</span>
-              </span>
-            ) : (
-              <span className="text-emerald-700 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-                <span>{language === 'ar' ? 'متوفر بالمخزن' : 'En stock'}</span>
-              </span>
-            )}
-          </div>
         </div>
       </div>
 
@@ -146,21 +130,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       <div className="p-3 pt-0">
         <button
           type="button"
-          disabled={isOutOfStock}
           onClick={handleAddToCart}
-          className={`w-full min-h-[44px] flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition ${
-            isOutOfStock
-              ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-              : 'bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white shadow-xs'
-          }`}
-          aria-label={isOutOfStock ? 'Indisponible' : `Ajouter ${name} au panier`}
+          className="w-full min-h-[44px] flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white shadow-xs"
+          aria-label={`Ajouter ${name} au panier`}
         >
           <ShoppingCart className="w-4 h-4 flex-shrink-0" />
-          <span>
-            {isOutOfStock
-              ? (language === 'ar' ? 'نفذت الكمية' : 'Indisponible')
-              : (language === 'ar' ? 'أضف للسلة' : 'Ajouter au Panier')}
-          </span>
+          <span>{language === 'ar' ? 'أضف للسلة' : 'Ajouter au Panier'}</span>
         </button>
       </div>
     </div>

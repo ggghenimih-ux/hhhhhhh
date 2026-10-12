@@ -64,8 +64,8 @@ export const AdminSettingsTab: React.FC = () => {
         storeDescription: settings.storeDescription || '',
         logoUrl: settings.logoUrl || '/logo.jpg',
         faviconUrl: settings.faviconUrl || '/logo.jpg',
-        phone: settings.phone || '+216 26 383 876',
-        whatsapp: settings.whatsapp || '+216 26 383 876',
+        phone: settings.phone,
+        whatsapp: settings.whatsapp || settings.phone,
         email: settings.email || 'contact@reparation-gsm.tn',
         address: settings.address || 'Tunis,tunis',
         workingHours: settings.workingHours || 'Mar - Dim: 08:00 - 18:00 | Lundi: Fermé',
@@ -358,10 +358,11 @@ export const AdminSettingsTab: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-store-name" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Nom officiel du Magasin *
                 </label>
                 <input
+                  id="settings-store-name"
                   type="text"
                   value={formData.storeName}
                   onChange={(e) => handleChange('storeName', e.target.value)}
@@ -375,10 +376,11 @@ export const AdminSettingsTab: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-store-description" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Description courte (SEO & Footer)
                 </label>
                 <textarea
+                  id="settings-store-description"
                   rows={3}
                   value={formData.storeDescription}
                   onChange={(e) => handleChange('storeDescription', e.target.value)}
@@ -407,6 +409,7 @@ export const AdminSettingsTab: React.FC = () => {
                   <div className="space-y-2 flex-1">
                     <input
                       type="file"
+                      aria-label="Téléverser un nouveau logo"
                       ref={logoInputRef}
                       onChange={handleUploadLogo}
                       accept="image/*"
@@ -421,7 +424,9 @@ export const AdminSettingsTab: React.FC = () => {
                       <Upload className="w-3.5 h-3.5" />
                       <span>{isUploadingLogo ? 'Téléversement...' : 'Téléverser un nouveau logo'}</span>
                     </button>
+                    <label htmlFor="settings-logo-url" className="sr-only">URL du logo</label>
                     <input
+                      id="settings-logo-url"
                       type="text"
                       value={formData.logoUrl}
                       onChange={(e) => handleChange('logoUrl', e.target.value)}
@@ -449,6 +454,7 @@ export const AdminSettingsTab: React.FC = () => {
                   <div className="space-y-2 flex-1">
                     <input
                       type="file"
+                      aria-label="Téléverser un favicon"
                       ref={faviconInputRef}
                       onChange={handleUploadFavicon}
                       accept="image/*"
@@ -463,7 +469,9 @@ export const AdminSettingsTab: React.FC = () => {
                       <Upload className="w-3.5 h-3.5" />
                       <span>{isUploadingFavicon ? 'Téléversement...' : 'Téléverser un favicon'}</span>
                     </button>
+                    <label htmlFor="settings-favicon-url" className="sr-only">URL du favicon</label>
                     <input
+                      id="settings-favicon-url"
                       type="text"
                       value={formData.faviconUrl}
                       onChange={(e) => handleChange('faviconUrl', e.target.value)}
@@ -487,10 +495,11 @@ export const AdminSettingsTab: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-phone" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Numéro de Téléphone (Hotline) *
                 </label>
                 <input
+                  id="settings-phone"
                   type="text"
                   value={formData.phone}
                   onChange={(e) => handleChange('phone', e.target.value)}
@@ -504,10 +513,11 @@ export const AdminSettingsTab: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-whatsapp" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Numéro WhatsApp (Chat direct)
                 </label>
                 <input
+                  id="settings-whatsapp"
                   type="text"
                   value={formData.whatsapp}
                   onChange={(e) => handleChange('whatsapp', e.target.value)}
@@ -520,10 +530,11 @@ export const AdminSettingsTab: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-email" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Adresse Email de contact *
                 </label>
                 <input
+                  id="settings-email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleChange('email', e.target.value)}
@@ -534,10 +545,11 @@ export const AdminSettingsTab: React.FC = () => {
               </div>
 
               <div className="sm:col-span-2">
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-address" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Adresse physique / Siège
                 </label>
                 <input
+                  id="settings-address"
                   type="text"
                   value={formData.address}
                   onChange={(e) => handleChange('address', e.target.value)}
@@ -547,10 +559,11 @@ export const AdminSettingsTab: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-working-hours" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Horaires d'ouverture
                 </label>
                 <input
+                  id="settings-working-hours"
                   type="text"
                   value={formData.workingHours}
                   onChange={(e) => handleChange('workingHours', e.target.value)}
@@ -572,10 +585,11 @@ export const AdminSettingsTab: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-facebook" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Page Facebook
                 </label>
                 <input
+                  id="settings-facebook"
                   type="url"
                   value={formData.facebookUrl}
                   onChange={(e) => handleChange('facebookUrl', e.target.value)}
@@ -585,10 +599,11 @@ export const AdminSettingsTab: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-instagram" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Compte Instagram
                 </label>
                 <input
+                  id="settings-instagram"
                   type="url"
                   value={formData.instagramUrl}
                   onChange={(e) => handleChange('instagramUrl', e.target.value)}
@@ -598,10 +613,11 @@ export const AdminSettingsTab: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-tiktok" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Compte TikTok
                 </label>
                 <input
+                  id="settings-tiktok"
                   type="url"
                   value={formData.tiktokUrl}
                   onChange={(e) => handleChange('tiktokUrl', e.target.value)}
@@ -611,10 +627,11 @@ export const AdminSettingsTab: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-youtube" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Chaîne YouTube
                 </label>
                 <input
+                  id="settings-youtube"
                   type="url"
                   value={formData.youtubeUrl}
                   onChange={(e) => handleChange('youtubeUrl', e.target.value)}
@@ -636,10 +653,11 @@ export const AdminSettingsTab: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-shipping-fee" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Frais de livraison standard (TND) *
                 </label>
                 <input
+                  id="settings-shipping-fee"
                   type="number"
                   step="0.5"
                   min="0"
@@ -654,10 +672,11 @@ export const AdminSettingsTab: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-free-shipping-threshold" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Seuil pour Livraison Gratuite (TND) *
                 </label>
                 <input
+                  id="settings-free-shipping-threshold"
                   type="number"
                   step="1"
                   min="0"
@@ -672,10 +691,11 @@ export const AdminSettingsTab: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-currency" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Symbole de la monnaie
                 </label>
                 <input
+                  id="settings-currency"
                   type="text"
                   value={formData.currency}
                   onChange={(e) => handleChange('currency', e.target.value)}
@@ -701,10 +721,11 @@ export const AdminSettingsTab: React.FC = () => {
 
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-hero-title" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Titre Principal du Hero *
                 </label>
                 <input
+                  id="settings-hero-title"
                   type="text"
                   value={formData.heroTitle}
                   onChange={(e) => handleChange('heroTitle', e.target.value)}
@@ -715,10 +736,11 @@ export const AdminSettingsTab: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                <label htmlFor="settings-hero-subtitle" className="text-xs font-bold text-slate-700 block mb-1.5">
                   Sous-titre / Texte explicatif
                 </label>
                 <textarea
+                  id="settings-hero-subtitle"
                   rows={3}
                   value={formData.heroSubtitle}
                   onChange={(e) => handleChange('heroSubtitle', e.target.value)}
@@ -729,10 +751,11 @@ export const AdminSettingsTab: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  <label htmlFor="settings-hero-button-text" className="text-xs font-bold text-slate-700 block mb-1.5">
                     Texte du Bouton d'action principal
                   </label>
                   <input
+                    id="settings-hero-button-text"
                     type="text"
                     value={formData.heroButtonText}
                     onChange={(e) => handleChange('heroButtonText', e.target.value)}
@@ -742,10 +765,11 @@ export const AdminSettingsTab: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  <label htmlFor="settings-hero-button-link" className="text-xs font-bold text-slate-700 block mb-1.5">
                     Lien cible du Bouton (Route interne)
                   </label>
                   <input
+                    id="settings-hero-button-link"
                     type="text"
                     value={formData.heroButtonLink}
                     onChange={(e) => handleChange('heroButtonLink', e.target.value)}
@@ -772,6 +796,7 @@ export const AdminSettingsTab: React.FC = () => {
                   <div className="space-y-2 flex-1">
                     <input
                       type="file"
+                      aria-label="Téléverser une image Hero"
                       ref={heroInputRef}
                       onChange={handleUploadHeroImage}
                       accept="image/*"
@@ -786,7 +811,9 @@ export const AdminSettingsTab: React.FC = () => {
                       <Upload className="w-3.5 h-3.5" />
                       <span>{isUploadingHero ? 'Téléversement...' : 'Téléverser une image Hero'}</span>
                     </button>
+                    <label htmlFor="settings-hero-image-url" className="sr-only">URL de l’image Hero</label>
                     <input
+                      id="settings-hero-image-url"
                       type="text"
                       value={formData.heroImage}
                       onChange={(e) => handleChange('heroImage', e.target.value)}

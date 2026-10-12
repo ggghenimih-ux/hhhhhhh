@@ -26,7 +26,7 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({
       subcategory: null,
       searchQuery: '',
     }));
-    navigateTo('products');
+    navigateTo('category', { categorySlug: id });
   };
 
   return (

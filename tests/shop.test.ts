@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { isValidTunisianPhone, sanitizePhone } from '../server/validators/schemas';
+import express from 'express';
+import request from 'supertest';
+import { isValidTunisianPhone, ProductSchema, ProductStockSchema, ProductUpdateSchema, sanitizePhone } from '../server/validators/schemas';
 import { calculateShipping, processOrderCreation } from '../server/services/orderService';
+import { UNLIMITED_STOCK } from '../server/config/stock';
+import { getOrderById, getOrderByNumber } from '../server/controllers/orderController';
+import { uploadSingleImage } from '../server/middleware/upload';
 import { prisma } from '../server/db/client';
 
 describe('1. Tunisian Phone Number Validation', () => {
@@ -39,8 +44,27 @@ describe('2. Shipping & Financial Calculations', () => {
   });
 });
 
-describe('3. Database & Order Processing Integration', () => {
+describe('3. Unlimited stock configuration', () => {
+  it('forces unlimited stock for product creation, updates, and stock edits', () => {
+    const baseProduct = {
+      name: 'Test Product',
+      description: 'A sufficiently long description',
+      priceTND: 10,
+      category: 'tools',
+      image: '/product.jpg',
+      stock: 0,
+    };
+
+    expect(ProductSchema.parse(baseProduct).stock).toBe(UNLIMITED_STOCK);
+    expect(ProductUpdateSchema.parse({ stock: 4 }).stock).toBe(UNLIMITED_STOCK);
+    expect(ProductStockSchema.parse({ stock: 0 }).stock).toBe(UNLIMITED_STOCK);
+  });
+});
+
+describe('4. Database & Order Processing Integration', () => {
   let testProductId: string;
+  let createdOrderId: string;
+  let createdOrderNumber: string;
   const initialStock = 10;
   const unitPrice = 50.0;
 
@@ -63,11 +87,12 @@ describe('3. Database & Order Processing Integration', () => {
 
   afterAll(async () => {
     // Cleanup test data
+    await prisma.order.deleteMany({ where: { items: { some: { productId: testProductId } } } });
     await prisma.orderItem.deleteMany({ where: { productId: testProductId } });
     await prisma.product.deleteMany({ where: { id: testProductId } });
   });
 
-  it('should create order, decrement stock correctly and calculate total with shipping', async () => {
+  it('should create an order without consuming unlimited stock and calculate total with shipping', async () => {
     const qtyToOrder = 2;
     const order = await processOrderCreation({
       customerName: 'Karim Test',
@@ -88,18 +113,19 @@ describe('3. Database & Order Processing Integration', () => {
     expect(order.subtotalTND).toBe(unitPrice * qtyToOrder);
     expect(order.shippingTND).toBe(7.0); // 100 < 300
     expect(order.totalTND).toBe(107.0);
+    createdOrderId = order.id;
+    createdOrderNumber = order.orderNumber;
 
-    // Verify atomic stock deduction
+    // Unlimited stock is not consumed by orders
     const updatedProd = await prisma.product.findUnique({ where: { id: testProductId } });
-    expect(updatedProd?.stock).toBe(initialStock - qtyToOrder);
+    expect(updatedProd?.stock).toBe(initialStock);
   });
 
-  it('should prevent order and throw error when requested quantity exceeds available stock', async () => {
+  it('should allow an order quantity greater than the stored stock', async () => {
     const currentProd = await prisma.product.findUnique({ where: { id: testProductId } });
     const excessQty = (currentProd?.stock || 0) + 50;
 
-    await expect(
-      processOrderCreation({
+    const order = await processOrderCreation({
         customerName: 'Samir Overstock',
         customerPhone: '98456123',
         governorate: 'Sfax',
@@ -111,7 +137,85 @@ describe('3. Database & Order Processing Integration', () => {
             quantity: excessQty,
           },
         ],
-      })
-    ).rejects.toThrow();
+      });
+
+    expect(order).toBeDefined();
+    const updatedProd = await prisma.product.findUnique({ where: { id: testProductId } });
+    expect(updatedProd?.stock).toBe(initialStock);
+  });
+
+  it('should apply the valid GSM10 coupon on the server total', async () => {
+    const order = await processOrderCreation({
+      customerName: 'Karim Coupon',
+      customerPhone: '98456123',
+      governorate: 'Tunis',
+      address: 'Tunis Centre',
+      paymentMethod: 'cod',
+      couponCode: 'gsm10',
+      items: [{ productId: testProductId, quantity: 1 }],
+    });
+
+    expect(order.couponCode).toBe('GSM10');
+    expect(order.discountAmount).toBe(5);
+    expect(order.totalTND).toBe(52);
+  });
+
+  it('should reject an invalid coupon before creating an order', async () => {
+    await expect(
+      processOrderCreation({
+        customerName: 'Karim Invalid Coupon',
+        customerPhone: '98456123',
+        governorate: 'Tunis',
+        address: 'Tunis Centre',
+        paymentMethod: 'cod',
+        couponCode: 'INVALID',
+        items: [{ productId: testProductId, quantity: 1 }],
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('should deny getOrderById when the requester is not the order owner', async () => {
+    const app = express();
+    app.get(
+      '/orders/:id',
+      (req, _res, next) => {
+        (req as any).user = { id: 'not-the-owner', role: 'CUSTOMER' };
+        next();
+      },
+      getOrderById,
+    );
+
+    const response = await request(app).get(`/orders/${createdOrderId}`);
+    expect(response.status).toBe(403);
+  });
+
+  it('should mask customer details in public order tracking', async () => {
+    const app = express();
+    app.get('/orders/:orderNumber', getOrderByNumber);
+
+    const response = await request(app).get(`/orders/${createdOrderNumber}`);
+    const trackedOrder = response.body.data;
+    expect(response.status).toBe(200);
+    expect(trackedOrder.customerName).not.toBe('Karim Test');
+    expect(trackedOrder.customerPhone).not.toBe('+21626383876');
+    expect(trackedOrder.address).toBe('••••••••');
+    expect(trackedOrder).not.toHaveProperty('customerEmail');
+  });
+
+  it('should reject uploads that are not valid image files', async () => {
+    const app = express();
+    app.post('/upload', uploadSingleImage, (_req, res) => res.sendStatus(201));
+    app.use((err: any, _req: any, res: any, _next: any) => {
+      res.status(err.status || 400).json({ message: err.message });
+    });
+
+    const response = await request(app)
+      .post('/upload')
+      .attach('image', Buffer.from('not an image'), {
+        filename: 'fake.png',
+        contentType: 'image/png',
+      });
+
+    expect(response.status).toBe(400);
   });
 });

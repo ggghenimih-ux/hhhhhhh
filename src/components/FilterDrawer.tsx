@@ -1,6 +1,7 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { X, RotateCcw, Check } from 'lucide-react';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 
 interface FilterDrawerProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
     resetFilters,
     getLocalizedName,
   } = useStore();
+  const dialogRef = useDialogAccessibility(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -35,7 +37,14 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
       />
 
       {/* Drawer */}
-      <div className="relative ms-auto w-full max-w-xs bg-white h-full flex flex-col shadow-2xl z-10 overflow-y-auto">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={language === 'ar' ? 'تصفية المنتجات' : 'Filtres'}
+        tabIndex={-1}
+        className="relative ms-auto w-full max-w-xs bg-white h-full flex flex-col shadow-2xl z-10 overflow-y-auto"
+      >
         {/* Header */}
         <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 sticky top-0 z-10">
           <div className="flex items-center gap-2">
@@ -84,7 +93,7 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
               </button>
 
               {categories.map((c) => {
-                const active = filters.category === c.id;
+                const active = filters.category === c.slug;
                 return (
                   <button
                     key={c.id}
@@ -92,7 +101,7 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
                     onClick={() =>
                       setFilters((prev) => ({
                         ...prev,
-                        category: active ? null : c.id,
+                        category: active ? null : c.slug,
                         subcategory: null,
                       }))
                     }
@@ -145,18 +154,6 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
 
           {/* Availability & Deals Toggles */}
           <div className="space-y-2 pt-2 border-t border-slate-100">
-            <label className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 cursor-pointer text-xs text-slate-700 select-none">
-              <span>{t.inStockOnly || 'En stock uniquement'}</span>
-              <input
-                type="checkbox"
-                checked={filters.inStockOnly}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, inStockOnly: e.target.checked }))
-                }
-                className="rounded border-slate-300 text-orange-600 focus:ring-orange-500"
-              />
-            </label>
-
             <label className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 cursor-pointer text-xs text-slate-700 select-none">
               <span>{t.onSaleOnly || 'En promotion'}</span>
               <input

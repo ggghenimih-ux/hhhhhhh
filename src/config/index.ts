@@ -29,10 +29,6 @@ export const STORE_CONFIG = {
   name: 'Outils Réparation GSM',
   domain: 'goods.tn',
   email: getEnv('STORE_EMAIL', 'contact@outils-reparation-gsm.tn'),
-  phones: [
-    getEnv('STORE_PHONE_PRIMARY', '+216 26 383 876'),
-    getEnv('STORE_PHONE_SECONDARY', '+216 26 383 876'),
-  ],
   workingHours: {
     scheduleFr: 'Mardi - Dimanche : 08:00 - 16:00 (Lundi : Fermé)',
     scheduleAr: 'الثلاثاء - الأحد: 08:00 - 16:00 (الاثنين: مغلق)',

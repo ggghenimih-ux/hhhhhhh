@@ -1,10 +1,13 @@
-import jwt from 'jsonwebtoken';
+import jwt, { JwtPayload } from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { Response, CookieOptions } from 'express';
 import { JWT_SECRET, JWT_ALGORITHM, isProduction } from '../security';
 
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
-const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+// Source unique de la durée de session : le token ET le cookie en dérivent (plus de décalage possible).
+const SESSION_SECONDS = {
+  CUSTOMER: 7 * 24 * 60 * 60, // 7 jours
+  ADMIN: 12 * 60 * 60, // 12 heures
+} as const;
 
 // Dummy hash so login takes the same time whether or not the account exists
 export const DUMMY_HASH = bcrypt.hashSync('dummy-password-for-timing', 12);
@@ -17,13 +20,25 @@ export const comparePassword = async (password: string, hash: string): Promise<b
   return bcrypt.compare(password, hash);
 };
 
-export const generateToken = (payload: { id?: string; userId?: string; email?: string; role: string }): string => {
+/**
+ * Le token ne contient plus que : sub (id utilisateur) et tv (tokenVersion).
+ * Le rôle est TOUJOURS relu en base : il ne faut jamais faire confiance à un rôle porté par le token.
+ * Incrémenter user.tokenVersion invalide immédiatement tous les tokens existants de l'utilisateur.
+ */
+export const generateToken = (payload: {
+  id?: string;
+  userId?: string;
+  email?: string;
+  role: string;
+  tokenVersion?: number;
+}): string => {
   const uid = payload.userId || payload.id || '';
-  return jwt.sign(
-    { userId: uid, id: uid, role: payload.role },
-    JWT_SECRET,
-    { algorithm: JWT_ALGORITHM, expiresIn: JWT_EXPIRES_IN as any }
-  );
+  const ttl = payload.role === 'ADMIN' ? SESSION_SECONDS.ADMIN : SESSION_SECONDS.CUSTOMER;
+  return jwt.sign({ tv: payload.tokenVersion ?? 0 }, JWT_SECRET, {
+    algorithm: JWT_ALGORITHM,
+    subject: uid,
+    expiresIn: ttl,
+  });
 };
 
 // SameSite=None is only needed when the site is embedded in a cross-site iframe.
@@ -38,7 +53,9 @@ const baseCookieOptions = (): CookieOptions => ({
 });
 
 export const setAuthCookie = (res: Response, token: string) => {
-  res.cookie('gsm_token', token, { ...baseCookieOptions(), maxAge: COOKIE_MAX_AGE });
+  const exp = (jwt.decode(token) as JwtPayload | null)?.exp;
+  const maxAge = exp ? Math.max(0, exp * 1000 - Date.now()) : SESSION_SECONDS.CUSTOMER * 1000;
+  res.cookie('gsm_token', token, { ...baseCookieOptions(), maxAge });
 };
 
 export const clearAuthCookie = (res: Response) => {

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   Product,
   Category,
@@ -14,188 +14,79 @@ import {
 } from '../types';
 import { TRANSLATIONS } from '../translations';
 import { api } from '../services/api';
-import { DEMO_ORDERS, DEMO_USER, PRODUCTS_DATA, CATEGORIES_DATA } from '../data/mockData';
+import { useAuth } from './AuthContext';
+import { StoreSlicesProvider } from './StoreSlices';
+import { PRODUCTS_DATA, CATEGORIES_DATA } from '../data/mockData';
+import { DEFAULT_STORE_SETTINGS, initialFilters } from './storeDefaults';
+import { AppRoute, RouteParams, StoreContextType, ToastMessage } from './storeTypes';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { MAX_ORDER_QUANTITY } from '../utils/stock';
 
-export type AppRoute =
-  | 'home'
-  | 'products'
-  | 'product-detail'
-  | 'category'
-  | 'search'
-  | 'cart'
-  | 'checkout'
-  | 'order-success'
-  | 'track-order'
-  | 'login'
-  | 'register'
-  | 'profile'
-  | 'admin'
-  | 'admin-login'
-  | 'admin-products'
-  | 'admin-categories'
-  | 'admin-orders'
-  | 'admin-settings'
-  | 'not-found';
-
-export interface ToastMessage {
-  id: string;
-  type: 'success' | 'error' | 'info';
-  message: string;
-}
-
-export interface RouteParams {
-  productId?: string;
-  productSlug?: string;
-  categorySlug?: string;
-  searchQuery?: string;
-  orderNumber?: string;
-}
-
-export interface StoreContextType {
-  // Locale & Translation
-  language: Language;
-  setLanguage: (lang: Language) => void;
-  currency: Currency;
-  setCurrency: (curr: Currency) => void;
-  t: (typeof TRANSLATIONS)['fr'];
-  formatPrice: (amount?: number | null) => string;
-  getLocalizedName: (item: any) => string;
-  getLocalizedDesc: (item: any) => string;
-  getProductPrice: (product: Product) => number;
-
-  // Routing
-  currentRoute: AppRoute;
-  routeParams: RouteParams;
-  navigateTo: (route: AppRoute, params?: RouteParams) => void;
-
-  // Store Settings (Dynamic CMS)
-  settings: StoreSettings;
-  isLoadingSettings: boolean;
-  refetchSettings: () => Promise<void>;
-  updateSettings: (data: Partial<StoreSettings>) => Promise<StoreSettings>;
-
-  // Catalog Data
-  products: Product[];
-  setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
-  categories: Category[];
-  isLoadingProducts: boolean;
-  isLoadingCategories: boolean;
-  refreshProducts: () => Promise<void>;
-  refreshCategories: () => Promise<void>;
-
-  // Filters & Search
-  filters: FilterState;
-  setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
-  resetFilters: () => void;
-  filteredProducts: Product[];
-
-  // Cart
-  cart: CartItem[];
-  addToCart: (product: Product, quantity?: number, variant?: Variant) => void;
-  removeFromCart: (productId: string, variantId?: string) => void;
-  updateQuantity: (productId: string, quantity: number, variantId?: string) => void;
-  clearCart: () => void;
-  cartCount: number;
-  cartSubtotal: number;
-  shippingFee: number;
-  freeShippingThreshold: number;
-  cartTotal: number;
-
-  // Coupons
-  couponCode: string;
-  setCouponCode: (code: string) => void;
-  discountRate: number;
-
-  // Wishlist
-  wishlist: string[];
-  toggleWishlist: (productId: string) => void;
-  isInWishlist: (productId: string) => boolean;
-
-  // Quick View & Selected Product
-  quickViewProduct: Product | null;
-  setQuickViewProduct: (product: Product | null) => void;
-  detailProduct: Product | null;
-  setDetailProduct: (product: Product | null) => void;
-
-  // Modals & Drawers Visibility
-  isCartDrawerOpen: boolean;
-  setIsCartDrawerOpen: (open: boolean) => void;
-  isWishlistDrawerOpen: boolean;
-  setIsWishlistDrawerOpen: (open: boolean) => void;
-  isAuthModalOpen: boolean;
-  setIsAuthModalOpen: (open: boolean) => void;
-  isAdminModalOpen: boolean;
-  setIsAdminModalOpen: (open: boolean) => void;
-  isCheckoutModalOpen: boolean;
-  setIsCheckoutModalOpen: (open: boolean) => void;
-  isOrderSuccessModalOpen: boolean;
-  setIsOrderSuccessModalOpen: (open: boolean) => void;
-  isTrackOrderModalOpen: boolean;
-  setIsTrackOrderModalOpen: (open: boolean) => void;
-
-  // Auth
-  user: User | null;
-  setUser: (user: User | null) => void;
-  isLoadingUser: boolean;
-  logout: () => Promise<void>;
-
-  // Orders
-  orders: Order[];
-  setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
-  refreshOrders: () => Promise<void>;
-  updateOrderStatus: (orderId: string, status: OrderStatus) => void;
-  lastPlacedOrder: Order | null;
-  setLastPlacedOrder: (order: Order | null) => void;
-  createOrder: (orderData: any) => Promise<Order>;
-
-  // Toast Notifications
-  toasts: ToastMessage[];
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
-  removeToast: (id: string) => void;
-}
-
-const DEFAULT_STORE_SETTINGS: StoreSettings = {
-  id: 'default',
-  storeName: 'Outils Réparation GSM Tunisie',
-  storeDescription: 'N°1 en Outillage & Équipements de Réparation Smartphone en Tunisie. Stations de soudure, microscopes, programmeurs et pièces détachées.',
-  logoUrl: '/logo.jpg',
-  faviconUrl: '/logo.jpg',
-  phone: '+216 26 383 876',
-  whatsapp: '+216 26 383 876',
-  email: 'contact@reparation-gsm.tn',
-  address: 'Tunis,tunis',
-  facebookUrl: 'https://facebook.com/outils.reparation.gsm',
-  instagramUrl: 'https://instagram.com/outils.reparation.gsm',
-  tiktokUrl: 'https://tiktok.com/@outilsreparationgsm',
-  youtubeUrl: 'https://youtube.com/@outilsreparationgsm',
-  workingHours: 'Mar - Dim: 08:00 - 18:00 | Lundi: Fermé',
-  defaultShippingTND: 7.0,
-  freeShippingThresholdTND: 300.0,
-  currency: 'DT',
-  primaryColor: '#ea580c',
-  secondaryColor: '#0f172a',
-  heroTitle: 'معدات وأدوات صيانة الهواتف الذكية للمحترفين',
-  heroSubtitle: 'محطات لحام دقيقة، ميكروسكوبات ثلاثية العيون، مبرمجات سوفتوير، ومزودات طاقة أصلية مع توصيل سريع 24/48 ساعة وضمان حقيقي.',
-  heroButtonText: 'عرض جميع المنتجات',
-  heroButtonLink: 'products',
-  heroImage: '/logo.jpg',
-};
-
-const initialFilters: FilterState = {
-  category: null,
-  subcategory: null,
-  brand: null,
-  minPrice: 0,
-  maxPrice: 2000,
-  inStockOnly: false,
-  discountOnly: false,
-  searchQuery: '',
-  sortBy: 'popularity',
-};
+export type { AppRoute, RouteParams, StoreContextType, ToastMessage } from './storeTypes';
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
+const decodeSegment = (value: string) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
+const routeForPath = (pathname: string): AppRoute => {
+  const [root, section] = pathname.split('/').filter(Boolean);
+  if (!root) return 'home';
+  if (root === 'products') return 'products';
+  if (root === 'product' && section) return 'product-detail';
+  if (root === 'category' && section) return 'category';
+  if (root === 'search') return 'search';
+  if (root === 'cart') return 'cart';
+  if (root === 'checkout') return 'checkout';
+  if (root === 'order-success') return 'order-success';
+  if (root === 'track') return 'track-order';
+  if (root === 'login') return 'login';
+  if (root === 'register') return 'register';
+  if (root === 'profile') return 'profile';
+  if (root === 'admin') {
+    if (section === 'login') return 'admin-login';
+    if (section === 'settings') return 'admin-settings';
+    if (section === 'products') return 'admin-products';
+    if (section === 'categories') return 'admin-categories';
+    if (section === 'orders') return 'admin-orders';
+    if (section === 'users') return 'admin-users';
+    if (section === 'media') return 'admin-media';
+    return 'admin';
+  }
+  return 'not-found';
+};
+
+const pathForLegacyHash = (hash: string): string | null => {
+  const value = hash.replace(/^#\/?/, '');
+  if (!value) return null;
+  const [root, ...segments] = value.split('/');
+  const tail = segments.map(encodeURIComponent).join('/');
+  if (['products', 'search', 'cart', 'checkout', 'login', 'register', 'profile'].includes(root)) {
+    return `/${root}${tail ? `/${tail}` : ''}`;
+  }
+  if (['product', 'category', 'order-success', 'track'].includes(root)) {
+    return `/${root}${tail ? `/${tail}` : ''}`;
+  }
+  if (root === 'admin') return `/admin${tail ? `/${tail}` : ''}`;
+  return null;
+};
+
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const location = useLocation();
+  const routerNavigate = useNavigate();
+  const initialPathname = useRef(location.pathname);
+  const hasResolvedLegacyHash = useRef(false);
+  const {
+    user,
+    loading: isLoadingUser,
+    logout: authLogout,
+  } = useAuth();
+
   // 1. Language & Currency
   const [language, setLanguageState] = useState<Language>(() => {
     return (localStorage.getItem('gsm_lang') as Language) || 'ar';
@@ -239,19 +130,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     fetchSettings();
   }, [fetchSettings]);
 
-  // Sync document head elements dynamically
   useEffect(() => {
-    if (settings.storeName) {
-      document.title = `${settings.storeName} | Matériel & Outillage GSM Tunisie`;
-    }
-
-    if (settings.storeDescription) {
-      const metaDesc = document.querySelector('meta[name="description"]');
-      if (metaDesc) {
-        metaDesc.setAttribute('content', settings.storeDescription);
-      }
-    }
-
     if (settings.faviconUrl) {
       let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
       if (!link) {
@@ -273,158 +152,171 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     throw new Error(res?.message || 'Erreur lors de la mise à jour des paramètres.');
   };
 
-  // 3. Routing state
-  const [currentRoute, setCurrentRoute] = useState<AppRoute>('home');
-  const [routeParams, setRouteParams] = useState<RouteParams>({});
-
-  const parseHash = useCallback(() => {
-    const hash = window.location.hash.replace(/^#\/?/, '');
-    if (!hash || hash === '') {
-      setCurrentRoute('home');
-      setRouteParams({});
-      return;
-    }
-
-    const parts = hash.split('/');
-    const root = parts[0];
-
-    if (root === 'products') {
-      setCurrentRoute('products');
-    } else if (root === 'product' && parts[1]) {
-      setCurrentRoute('product-detail');
-      setRouteParams({ productSlug: parts[1] });
-    } else if (root === 'category' && parts[1]) {
-      setCurrentRoute('category');
-      setRouteParams({ categorySlug: parts[1] });
-    } else if (root === 'search') {
-      setCurrentRoute('search');
-    } else if (root === 'cart') {
-      setCurrentRoute('cart');
-    } else if (root === 'checkout') {
-      setCurrentRoute('checkout');
-    } else if (root === 'order-success') {
-      setCurrentRoute('order-success');
-    } else if (root === 'track') {
-      setCurrentRoute('track-order');
-      if (parts[1]) setRouteParams({ orderNumber: parts[1] });
-    } else if (root === 'login') {
-      setCurrentRoute('login');
-    } else if (root === 'register') {
-      setCurrentRoute('register');
-    } else if (root === 'profile') {
-      setCurrentRoute('profile');
-    } else if (root === 'admin') {
-      if (parts[1] === 'login') {
-        setCurrentRoute('admin-login');
-      } else if (parts[1] === 'settings') {
-        setCurrentRoute('admin-settings');
-      } else if (parts[1] === 'products') {
-        setCurrentRoute('admin-products');
-      } else if (parts[1] === 'categories') {
-        setCurrentRoute('admin-categories');
-      } else if (parts[1] === 'orders') {
-        setCurrentRoute('admin-orders');
-      } else {
-        setCurrentRoute('admin');
-      }
-    } else {
-      setCurrentRoute('home');
-    }
-  }, []);
-
-  useEffect(() => {
-    parseHash();
-    window.addEventListener('hashchange', parseHash);
-    return () => window.removeEventListener('hashchange', parseHash);
-  }, [parseHash]);
-
-  const navigateTo = (route: AppRoute, params: RouteParams = {}) => {
-    setCurrentRoute(route);
-    setRouteParams(params);
-
-    let newHash = '';
-    switch (route) {
-      case 'home':
-        newHash = '';
-        break;
-      case 'products':
-        newHash = 'products';
-        break;
-      case 'product-detail':
-        newHash = `product/${params.productSlug || params.productId || ''}`;
-        break;
-      case 'category':
-        newHash = `category/${params.categorySlug || ''}`;
-        break;
-      case 'search':
-        newHash = 'search';
-        break;
-      case 'cart':
-        newHash = 'cart';
-        break;
-      case 'checkout':
-        newHash = 'checkout';
-        break;
-      case 'order-success':
-        newHash = 'order-success';
-        break;
-      case 'track-order':
-        newHash = params.orderNumber ? `track/${params.orderNumber}` : 'track';
-        break;
-      case 'login':
-        newHash = 'login';
-        break;
-      case 'register':
-        newHash = 'register';
-        break;
-      case 'profile':
-        newHash = 'profile';
-        break;
-      case 'admin':
-        newHash = 'admin';
-        break;
-      case 'admin-login':
-        newHash = 'admin/login';
-        break;
-      case 'admin-settings':
-        newHash = 'admin/settings';
-        break;
-      case 'admin-products':
-        newHash = 'admin/products';
-        break;
-      case 'admin-categories':
-        newHash = 'admin/categories';
-        break;
-      case 'admin-orders':
-        newHash = 'admin/orders';
-        break;
-      default:
-        newHash = route;
-    }
-
-    if (window.location.hash !== `#${newHash}`) {
-      window.location.hash = newHash;
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  // 3. History-based routing, with a one-way bridge for bookmarked hash URLs.
+  const currentRoute = routeForPath(location.pathname);
+  const pathParts = location.pathname.split('/').filter(Boolean).map(decodeSegment);
+  const routeParams: RouteParams = {
+    ...(currentRoute === 'product-detail' ? { productSlug: pathParts[1] } : {}),
+    ...(currentRoute === 'admin-products' && new URLSearchParams(location.search).get('productId')
+      ? {
+          productId: new URLSearchParams(location.search).get('productId') || undefined,
+          productAction: new URLSearchParams(location.search).get('productAction') === 'delete' ? 'delete' : 'edit',
+        }
+      : {}),
+    ...(currentRoute === 'category' ? { categorySlug: pathParts[1] } : {}),
+    ...(currentRoute === 'order-success' && pathParts[1] ? { orderNumber: pathParts[1] } : {}),
+    ...(currentRoute === 'track-order' && pathParts[1] ? { orderNumber: pathParts[1] } : {}),
+    ...(currentRoute === 'search' && new URLSearchParams(location.search).get('q')
+      ? { searchQuery: new URLSearchParams(location.search).get('q') || undefined }
+      : {}),
   };
 
+  useEffect(() => {
+    if (hasResolvedLegacyHash.current || isLoadingUser) return;
+    hasResolvedLegacyHash.current = true;
+    if (initialPathname.current !== '/' || location.pathname !== '/' || user) return;
+
+    const legacyPath = pathForLegacyHash(window.location.hash);
+    if (legacyPath) routerNavigate(legacyPath, { replace: true });
+  }, [location.pathname, isLoadingUser, user, routerNavigate]);
+
+  const navigateTo = useCallback((route: AppRoute, params: RouteParams = {}) => {
+    let path = '/';
+    switch (route) {
+      case 'home':
+        break;
+      case 'products':
+        path = '/products';
+        break;
+      case 'product-detail':
+        path = `/product/${encodeURIComponent(params.productSlug || params.productId || '')}`;
+        break;
+      case 'category':
+        path = `/category/${encodeURIComponent(params.categorySlug || '')}`;
+        break;
+      case 'search':
+        path = params.searchQuery
+          ? `/search?q=${encodeURIComponent(params.searchQuery)}`
+          : '/search';
+        break;
+      case 'cart':
+        path = '/cart';
+        break;
+      case 'checkout':
+        path = '/checkout';
+        break;
+      case 'order-success':
+        path = params.orderNumber
+          ? `/order-success/${encodeURIComponent(params.orderNumber)}`
+          : '/order-success';
+        break;
+      case 'track-order':
+        path = params.orderNumber ? `/track/${encodeURIComponent(params.orderNumber)}` : '/track';
+        break;
+      case 'login':
+        path = '/login';
+        break;
+      case 'register':
+        path = '/register';
+        break;
+      case 'profile':
+        path = '/profile';
+        break;
+      case 'admin':
+        path = '/admin';
+        break;
+      case 'admin-login':
+        path = '/admin/login';
+        break;
+      case 'admin-settings':
+        path = '/admin/settings';
+        break;
+      case 'admin-products':
+        path = params.productId
+          ? `/admin/products?productId=${encodeURIComponent(params.productId)}&productAction=${params.productAction || 'edit'}`
+          : '/admin/products';
+        break;
+      case 'admin-categories':
+        path = '/admin/categories';
+        break;
+      case 'admin-orders':
+        path = '/admin/orders';
+        break;
+      case 'admin-users':
+        path = '/admin/users';
+        break;
+      case 'admin-media':
+        path = '/admin/media';
+        break;
+      case 'not-found':
+        path = '/404';
+        break;
+    }
+    routerNavigate(path);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [routerNavigate]);
+
+  useEffect(() => {
+    if (currentRoute === 'register' && !isLoadingUser && user) {
+      navigateTo('home');
+    }
+  }, [currentRoute, isLoadingUser, user, navigateTo]);
+
   // 4. Products & Categories from Backend Database
-  const [products, setProducts] = useState<Product[]>(PRODUCTS_DATA);
-  const [categories, setCategories] = useState<Category[]>(CATEGORIES_DATA);
+  const [filters, setFiltersState] = useState<FilterState>(initialFilters);
+  const [productPage, setProductPage] = useState(1);
+  const [productPagination, setProductPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [products, setProducts] = useState<Product[]>(import.meta.env.DEV ? PRODUCTS_DATA : []);
+  const [categories, setCategories] = useState<Category[]>(import.meta.env.DEV ? CATEGORIES_DATA : []);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [productsError, setProductsError] = useState<string | null>(null);
+  const productRequestId = useRef(0);
 
-  const fetchProducts = async () => {
+  const setFilters: React.Dispatch<React.SetStateAction<FilterState>> = (action) => {
+    setFiltersState((prev) => (typeof action === 'function' ? action(prev) : action));
+    setProductPage(1);
+  };
+
+  const fetchProducts = async (
+    page = productPage,
+    currentFilters: FilterState = filters,
+  ) => {
+    const requestId = ++productRequestId.current;
     try {
       setIsLoadingProducts(true);
-      const res = await api.products.getAll({ limit: 100, admin: 'true' });
-      if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-        setProducts(res.data);
+      setProductsError(null);
+      const res = await api.products.getAll({
+        limit: 12,
+        page,
+        search: currentFilters.searchQuery.trim() || undefined,
+        sortBy: currentFilters.sortBy === 'popularity' ? 'rating' : currentFilters.sortBy,
+        category: currentFilters.category || undefined,
+        minPrice: currentFilters.minPrice || undefined,
+        maxPrice: currentFilters.maxPrice < 2000 ? currentFilters.maxPrice : undefined,
+        inStock: currentFilters.inStockOnly ? 'true' : undefined,
+        admin: user?.role === 'ADMIN' ? 'true' : undefined,
+      });
+      if (!Array.isArray(res?.data)) {
+        throw new Error(res?.message || 'Le serveur a retourné un catalogue invalide.');
       }
+      if (requestId !== productRequestId.current) return;
+      setProducts(res.data);
+      setProductPagination(res.pagination || {
+        page,
+        totalPages: 1,
+        total: res.data.length,
+      });
     } catch (err) {
-      console.warn('Using seeded catalog products:', err);
+      if (requestId !== productRequestId.current) return;
+      if (import.meta.env.DEV) {
+        setProducts(PRODUCTS_DATA);
+      } else {
+        setProducts([]);
+        setProductsError(err instanceof Error ? err.message : 'Impossible de charger les produits.');
+      }
     } finally {
-      setIsLoadingProducts(false);
+      if (requestId === productRequestId.current) setIsLoadingProducts(false);
     }
   };
 
@@ -432,58 +324,32 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       setIsLoadingCategories(true);
       const res = await api.categories.getAll();
-      if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (res?.data && Array.isArray(res.data)) {
         setCategories(res.data);
       }
     } catch (err) {
-      console.warn('Using seeded catalog categories:', err);
+      console.warn('Unable to load categories from the server:', err);
+      setCategories(import.meta.env.DEV ? CATEGORIES_DATA : []);
     } finally {
       setIsLoadingCategories(false);
     }
   };
 
   useEffect(() => {
-    fetchProducts();
     fetchCategories();
   }, []);
 
-  // 5. Authenticated User from Backend Session
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
-
-  const checkAuth = useCallback(async () => {
-    try {
-      setIsLoadingUser(true);
-      const res = await api.auth.getMe();
-      const currentUser = res?.user || res?.data;
-      if (currentUser && currentUser.id) {
-        setUser({
-          ...currentUser,
-          isAdmin: currentUser.role === 'ADMIN',
-        });
-      } else {
-        setUser(null);
-      }
-    } catch {
-      setUser(null);
-    } finally {
-      setIsLoadingUser(false);
-    }
-  }, []);
-
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    const timeout = window.setTimeout(() => {
+      void fetchProducts(productPage, filters);
+    }, 200);
+    return () => window.clearTimeout(timeout);
+  }, [filters, productPage, user?.role]);
 
   const logout = async () => {
-    try {
-      await api.auth.logout();
-      setUser(null);
-      showToast(language === 'ar' ? 'تم تسجيل الخروج بنجاح.' : 'Déconnexion effectuée.', 'info');
-      navigateTo('home');
-    } catch {
-      setUser(null);
-    }
+    await authLogout();
+    showToast(language === 'ar' ? 'تم تسجيل الخروج بنجاح.' : 'Déconnexion effectuée.', 'info');
+    navigateTo('home');
   };
 
   // 6. Cart Management
@@ -499,6 +365,33 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     localStorage.setItem('gsm_cart', JSON.stringify(cart));
   }, [cart]);
+
+  useEffect(() => {
+    const refreshSavedCart = async () => {
+      const savedCart = cart;
+      if (savedCart.length === 0) return;
+
+      try {
+        const refreshedCart = await Promise.all(
+          savedCart.map(async (item) => {
+            const res = await api.products.getById(item.product.id);
+            const product = res?.data as Product | undefined;
+            if (!product) return null;
+            return {
+              ...item,
+              product,
+              quantity: Math.min(item.quantity, MAX_ORDER_QUANTITY),
+            };
+          }),
+        );
+        setCart(refreshedCart.filter((item): item is CartItem => item !== null));
+      } catch (err) {
+        console.warn('Unable to refresh saved cart product data:', err);
+      }
+    };
+
+    refreshSavedCart();
+  }, []);
 
   // 7. Wishlist Management
   const [wishlist, setWishlist] = useState<string[]>(() => {
@@ -517,40 +410,36 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // 8. Modals & Drawers Visibility
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [isWishlistDrawerOpen, setIsWishlistDrawerOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
-  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
-  const [isOrderSuccessModalOpen, setIsOrderSuccessModalOpen] = useState(false);
-  const [isTrackOrderModalOpen, setIsTrackOrderModalOpen] = useState(false);
-
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
-  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [lastPlacedOrder, setLastPlacedOrder] = useState<Order | null>(null);
 
   // 9. Orders Store
   const [orders, setOrders] = useState<Order[]>(() => {
-    try {
-      const saved = localStorage.getItem('gsm_orders');
-      return saved ? JSON.parse(saved) : DEMO_ORDERS;
-    } catch {
-      return DEMO_ORDERS;
-    }
+    localStorage.removeItem('gsm_orders');
+    return [];
   });
 
   const fetchOrders = async () => {
+    if (user?.role !== 'ADMIN') {
+      setOrders([]);
+      return;
+    }
     try {
       const res = await api.orders.getAdminOrders({ limit: 50 });
-      if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-        setOrders(res.data);
-      }
+      setOrders(res?.data && Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.warn('Error fetching orders from backend:', err);
     }
   };
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    localStorage.removeItem('gsm_orders');
+    if (user?.role === 'ADMIN') {
+      void fetchOrders();
+    } else {
+      setOrders([]);
+    }
+  }, [user?.role]);
 
   const updateOrderStatus = (orderId: string, status: OrderStatus) => {
     setOrders((prev) =>
@@ -581,8 +470,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // 11. Filters
-  const [filters, setFilters] = useState<FilterState>(initialFilters);
-
   // 12. Toast Notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -633,12 +520,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Cart operations
   const addToCart = (product: Product, quantity = 1, variant?: Variant) => {
-    const currentStock = product.stock ?? 0;
-    if (currentStock <= 0) {
-      showToast(language === 'ar' ? 'المنتج غير متوفر حالياً بالمخزن.' : 'Produit en rupture de stock.', 'error');
-      return;
-    }
-
     setCart((prev) => {
       const existingIndex = prev.findIndex(
         (item) => item.product.id === product.id && item.selectedVariant?.id === variant?.id
@@ -649,11 +530,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const newQty = next[existingIndex].quantity + quantity;
         next[existingIndex] = {
           ...next[existingIndex],
-          quantity: Math.min(newQty, currentStock),
+          quantity: Math.min(newQty, MAX_ORDER_QUANTITY),
         };
         return next;
       } else {
-        return [...prev, { product, quantity: Math.min(quantity, currentStock), selectedVariant: variant }];
+        return [...prev, { product, quantity: Math.min(quantity, MAX_ORDER_QUANTITY), selectedVariant: variant }];
       }
     });
 
@@ -681,8 +562,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCart((prev) =>
       prev.map((item) => {
         if (item.product.id === productId && item.selectedVariant?.id === variantId) {
-          const maxStock = item.product.stock ?? 999;
-          return { ...item, quantity: Math.min(quantity, maxStock) };
+          return { ...item, quantity: Math.min(quantity, MAX_ORDER_QUANTITY) };
         }
         return item;
       })
@@ -764,47 +644,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return false;
     }
 
-    if (filters.searchQuery.trim()) {
-      const q = filters.searchQuery.toLowerCase();
-      const name = getLocalizedName(product).toLowerCase();
-      const desc = getLocalizedDesc(product).toLowerCase();
-      const brand = (
-        product.specs?.brand ||
-        product.specifications?.brand ||
-        product.brand ||
-        ''
-      ).toLowerCase();
-      if (!name.includes(q) && !desc.includes(q) && !brand.includes(q)) {
-        return false;
-      }
-    }
-
     return true;
-  }).sort((a, b) => {
-    const priceA = getProductPrice(a);
-    const priceB = getProductPrice(b);
-
-    if (filters.sortBy === 'price-asc') return priceA - priceB;
-    if (filters.sortBy === 'price-desc') return priceB - priceA;
-    if (filters.sortBy === 'rating') return (b.rating || 5) - (a.rating || 5);
-    if (filters.sortBy === 'newest')
-      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-    return (b.rating || 0) - (a.rating || 0);
   });
 
   // Order Creation (persists to backend API and local store)
   const createOrder = async (orderData: any): Promise<Order> => {
     const payload = {
-      customerName:
-        orderData.customerName ||
-        `${orderData.firstName || ''} ${orderData.lastName || ''}`.trim() ||
-        'Client GSM',
-      customerPhone: orderData.customerPhone || orderData.phone || '00000000',
-      customerEmail: orderData.customerEmail || orderData.email || 'contact@client.tn',
-      governorate: orderData.governorate || orderData.selectedGov || 'Tunis',
-      delegation: orderData.delegation || orderData.city || 'Tunis Centre',
-      address: orderData.address || orderData.street || 'Tunisie',
-      notes: orderData.notes || '',
+      customerName: orderData.customerName,
+      customerPhone: orderData.customerPhone,
+      customerEmail: orderData.customerEmail ?? null,
+      governorate: orderData.governorate,
+      delegation: orderData.delegation ?? null,
+      address: orderData.address,
+      notes: orderData.notes ?? null,
+      couponCode: couponCode || undefined,
       paymentMethod: orderData.paymentMethod || 'cod',
       items: cart.map((i) => ({
         productId: i.product.id,
@@ -813,54 +666,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       })),
     };
 
-    let newOrder: Order;
-
-    try {
-      const res = await api.orders.create(payload);
-      if (res?.data) {
-        newOrder = res.data;
-      } else {
-        throw new Error('Fallback to local order creation');
-      }
-    } catch {
-      // Fallback robust order generator
-      const orderNum = `GSM-TN-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-      newOrder = {
-        id: `ord-${Date.now()}`,
-        orderNumber: orderNum,
-        customerName: payload.customerName,
-        customerPhone: payload.customerPhone,
-        customerEmail: payload.customerEmail,
-        governorate: payload.governorate,
-        delegation: payload.delegation,
-        address: payload.address,
-        notes: payload.notes,
-        subtotalTND: cartSubtotal,
-        shippingTND: shippingFee,
-        totalTND: cartTotal,
-        subtotal: cartSubtotal,
-        shippingCost: shippingFee,
-        totalPrice: cartTotal,
-        status: 'PENDING',
-        orderStatus: 'pending',
-        paymentMethod: payload.paymentMethod,
-        paymentStatus: 'pending',
-        trackingNumber: `TN-ARAMEX-${Math.floor(1000000 + Math.random() * 9000000)}`,
-        carrierName: 'Aramex Express Tunisia',
-        items: cart.map((i) => ({
-          productId: i.product.id,
-          productName: getLocalizedName(i.product),
-          name: getLocalizedName(i.product),
-          image: i.product.images?.[0] || i.product.image,
-          sku: i.product.sku,
-          priceTND: getProductPrice(i.product),
-          price: getProductPrice(i.product),
-          quantity: i.quantity,
-          totalTND: getProductPrice(i.product) * i.quantity,
-        })),
-        createdAt: new Date().toISOString(),
-      };
+    const res = await api.orders.create(payload);
+    if (!res?.data) {
+      throw new Error(res?.message || 'Le serveur n’a pas retourné la commande.');
     }
+    const newOrder = res.data as Order;
 
     setOrders((prev) => [newOrder, ...prev]);
     setLastPlacedOrder(newOrder);
@@ -869,9 +679,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return newOrder;
   };
 
-  return (
-    <StoreContext.Provider
-      value={{
+  const storeValue: StoreContextType = {
         language,
         setLanguage,
         currency,
@@ -889,11 +697,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         refetchSettings: fetchSettings,
         updateSettings,
         products,
+        productsError,
         setProducts,
         categories,
         isLoadingProducts,
         isLoadingCategories,
-        refreshProducts: fetchProducts,
+        productPagination,
+        setProductPage,
+        refreshProducts: () => fetchProducts(productPage, filters),
         refreshCategories: fetchCategories,
         filters,
         setFilters,
@@ -917,24 +728,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isInWishlist,
         quickViewProduct,
         setQuickViewProduct,
-        detailProduct,
-        setDetailProduct,
         isCartDrawerOpen,
         setIsCartDrawerOpen,
         isWishlistDrawerOpen,
         setIsWishlistDrawerOpen,
-        isAuthModalOpen,
-        setIsAuthModalOpen,
-        isAdminModalOpen,
-        setIsAdminModalOpen,
-        isCheckoutModalOpen,
-        setIsCheckoutModalOpen,
-        isOrderSuccessModalOpen,
-        setIsOrderSuccessModalOpen,
-        isTrackOrderModalOpen,
-        setIsTrackOrderModalOpen,
         user,
-        setUser,
         isLoadingUser,
         logout,
         orders,
@@ -942,14 +740,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         refreshOrders: fetchOrders,
         updateOrderStatus,
         lastPlacedOrder,
-        setLastPlacedOrder,
         createOrder,
         toasts,
         showToast,
         removeToast,
-      }}
-    >
-      {children}
+  };
+
+  return (
+    <StoreContext.Provider value={storeValue}>
+      <StoreSlicesProvider value={storeValue}>{children}</StoreSlicesProvider>
     </StoreContext.Provider>
   );
 };

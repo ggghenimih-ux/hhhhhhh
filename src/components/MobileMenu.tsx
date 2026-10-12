@@ -1,22 +1,17 @@
 import React from 'react';
-import { useStore } from '../context/StoreContext';
+import { useStoreProducts, useStoreRouting, useStoreSettings } from '../context/StoreSlices';
+import { useAuth } from '../context/AuthContext';
 import {
   X,
   Phone,
   Truck,
   User as UserIcon,
   Package,
-  Wrench,
-  Flame,
-  Eye,
-  Zap,
-  Cpu,
-  Smartphone,
-  Layers,
   ChevronRight,
   Globe
 } from 'lucide-react';
 import { Logo } from './Logo';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 
 interface MobileMenuProps {
   isOpen: boolean;
@@ -24,37 +19,27 @@ interface MobileMenuProps {
 }
 
 export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
-  const {
-    t,
-    language,
-    setLanguage,
-    user,
-    setFilters,
-    navigateTo,
-    setIsAuthModalOpen,
-    setIsTrackOrderModalOpen
-  } = useStore();
+  const { t, language, setLanguage, settings } = useStoreSettings();
+  const { categories, getLocalizedName, setFilters } = useStoreProducts();
+  const { navigateTo } = useStoreRouting();
+  const { user } = useAuth();
+  const dialogRef = useDialogAccessibility(isOpen, onClose);
 
   if (!isOpen) return null;
 
-  const categories = [
-    { id: 'equipments-tools', name: { ar: 'معدات وأدوات', fr: 'Équipements & Outils', en: 'Equipment & Tools' }, icon: Wrench },
-    { id: 'soldering-hot-air', name: { ar: 'لحام وهواء ساخن', fr: 'Soudure & BGA', en: 'Soldering & Rework' }, icon: Flame },
-    { id: 'microscopes', name: { ar: 'ميكروسكوبات', fr: 'Microscopes & Optique', en: 'Microscopes' }, icon: Eye },
-    { id: 'power-supplies', name: { ar: 'مزودات طاقة', fr: 'Alimentation & Test', en: 'Power Supplies' }, icon: Zap },
-    { id: 'programmers', name: { ar: 'مبرمجات وبوكسات', fr: 'Programmeurs & Dongles', en: 'Programmers' }, icon: Cpu },
-    { id: 'spare-parts', name: { ar: 'قطع غيار', fr: 'Pièces Détachées', en: 'Spare Parts' }, icon: Smartphone },
-    { id: 'consumables', name: { ar: 'مستهلكات ولحام', fr: 'Consommables & Étain', en: 'Consumables' }, icon: Layers },
-  ];
-
-  const handleCategoryClick = (catId: string) => {
+  const handleCategoryClick = (slug: string) => {
     setFilters((prev) => ({
       ...prev,
-      category: catId,
+      category: slug,
       subcategory: null,
     }));
     onClose();
-    navigateTo('products');
+    navigateTo('category', { categorySlug: slug });
+  };
+
+  const handleAccountClick = () => {
+    onClose();
+    navigateTo(user ? 'profile' : 'login');
   };
 
   return (
@@ -67,7 +52,14 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
       />
 
       {/* Drawer */}
-      <div className="relative w-full max-w-xs bg-white h-full flex flex-col shadow-2xl z-10 overflow-y-auto">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={language === 'ar' ? 'القائمة' : 'Menu'}
+        tabIndex={-1}
+        className="relative w-full max-w-xs bg-white h-full flex flex-col shadow-2xl z-10 overflow-y-auto"
+      >
         {/* Drawer Header */}
         <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <Logo size="sm" showTagline={false} />
@@ -119,14 +111,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
         {/* Quick Action Navigation */}
         <div className="p-2 border-b border-slate-200">
           <button
-            onClick={() => {
-              onClose();
-              if (user) {
-                navigateTo('profile');
-              } else {
-                setIsAuthModalOpen(true);
-              }
-            }}
+            onClick={handleAccountClick}
             className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 text-slate-800 text-sm font-medium transition text-start"
           >
             <div className="flex items-center gap-3">
@@ -148,7 +133,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
           <button
             onClick={() => {
               onClose();
-              setIsTrackOrderModalOpen(true);
+              navigateTo('track-order');
             }}
             className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 text-slate-800 text-sm font-medium transition text-start"
           >
@@ -189,16 +174,15 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
             </button>
 
             {categories.map((cat) => {
-              const Icon = cat.icon;
-              const label = cat.name[language] || cat.name.fr;
+              const label = getLocalizedName(cat);
               return (
                 <button
                   key={cat.id}
-                  onClick={() => handleCategoryClick(cat.id)}
+                  onClick={() => handleCategoryClick(cat.slug)}
                   className="w-full flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 text-slate-800 text-xs font-medium transition text-start"
                 >
                   <span className="flex items-center gap-2.5">
-                    <Icon className="w-4 h-4 text-slate-500" />
+                    <Package className="w-4 h-4 text-slate-500" />
                     <span>{label}</span>
                   </span>
                   <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
@@ -228,11 +212,11 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
             {language === 'ar' ? 'خدمة العملاء والطلبات:' : 'Assistance & Commandes :'}
           </p>
           <a
-            href="tel:+21626383876"
+            href={`tel:${settings.phone.replace(/[\s\-\(\)]/g, '')}`}
             className="flex items-center justify-center gap-2 w-full py-2.5 bg-orange-600 text-white rounded-lg text-xs font-bold shadow-xs hover:bg-orange-700 transition"
           >
             <Phone className="w-3.5 h-3.5" />
-            <span>+216 26 383 876</span>
+            <span>{settings.phone}</span>
           </a>
         </div>
       </div>

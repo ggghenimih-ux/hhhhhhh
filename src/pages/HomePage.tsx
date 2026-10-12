@@ -4,58 +4,11 @@ import { Hero } from '../components/Hero';
 import { CategoryCard } from '../components/CategoryCard';
 import { ProductGrid } from '../components/ProductGrid';
 import { TrustBar } from '../components/TrustBar';
-import {
-  Wrench,
-  Flame,
-  Eye,
-  Zap,
-  Cpu,
-  Smartphone,
-  ArrowRight
-} from 'lucide-react';
+import { ArrowRight, Package } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
-  const { language, products, isLoadingProducts, navigateTo } = useStore();
-
-  // 6 Core categories for the homepage category section
-  const homeCategories = [
-    {
-      id: 'soldering-hot-air',
-      name: language === 'ar' ? 'لحام وهواء ساخن' : 'Soudure & Air Chaud',
-      icon: Flame,
-      count: products.filter((p) => p.category === 'soldering-hot-air' || (p as any).categoryId === 'soldering-hot-air').length || 18,
-    },
-    {
-      id: 'microscopes',
-      name: language === 'ar' ? 'ميكروسكوبات' : 'Microscopes & Optique',
-      icon: Eye,
-      count: products.filter((p) => p.category === 'microscopes' || (p as any).categoryId === 'microscopes').length || 12,
-    },
-    {
-      id: 'equipments-tools',
-      name: language === 'ar' ? 'معدات وأدوات' : 'Outils & Équipements',
-      icon: Wrench,
-      count: products.filter((p) => p.category === 'equipments-tools' || (p as any).categoryId === 'equipments-tools').length || 24,
-    },
-    {
-      id: 'power-supplies',
-      name: language === 'ar' ? 'مزودات طاقة' : 'Alimentation & Test',
-      icon: Zap,
-      count: products.filter((p) => p.category === 'power-supplies' || (p as any).categoryId === 'power-supplies').length || 9,
-    },
-    {
-      id: 'programmers',
-      name: language === 'ar' ? 'مبرمجات وبوكسات' : 'Programmeurs & Dongles',
-      icon: Cpu,
-      count: products.filter((p) => p.category === 'programmers' || (p as any).categoryId === 'programmers').length || 15,
-    },
-    {
-      id: 'spare-parts',
-      name: language === 'ar' ? 'قطع غيار' : 'Pièces Détachées',
-      icon: Smartphone,
-      count: products.filter((p) => p.category === 'spare-parts' || (p as any).categoryId === 'spare-parts').length || 42,
-    },
-  ];
+  const { language, products, categories, getLocalizedName, isLoadingProducts, navigateTo } = useStore();
+  const homeCategories = categories.slice(0, 6);
 
   // Select top featured products for home
   const featuredProducts = products
@@ -91,13 +44,12 @@ export const HomePage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-          {homeCategories.map((cat) => (
+          {homeCategories.map((category) => (
             <CategoryCard
-              key={cat.id}
-              id={cat.id}
-              name={cat.name}
-              icon={cat.icon}
-              count={cat.count}
+              key={category.id}
+              id={category.slug}
+              name={getLocalizedName(category)}
+              icon={Package}
             />
           ))}
         </div>

@@ -17,6 +17,8 @@ model User {
   phone        String
   passwordHash String
   role         String   @default("CUSTOMER") // "CUSTOMER" | "ADMIN"
+  emailVerifiedAt DateTime?
+  tokenVersion Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -89,13 +91,49 @@ model Order {
   paymentMethod String      @default("cod")     // cod, bank_transfer, online
   paymentStatus String      @default("pending") // pending, paid, failed
   statusHistory String      @default("[]")     // JSON string of status transitions with timestamp
+  archivedAt    DateTime?
+  archivedBy    String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
   user          User?       @relation(fields: [userId], references: [id])
   items         OrderItem[]
 
+  @@index([archivedAt, createdAt])
   @@map("orders")
+}
+
+model AdminOrderExport {
+  id             String   @id @default(uuid())
+  actorId        String
+  tokenHash      String   @unique
+  fromDate       DateTime
+  toDate         DateTime
+  snapshotAt     DateTime
+  orderIdsJson   String
+  orderCount     Int
+  exportedAt     DateTime @default(now())
+  consumedAt     DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+
+  @@index([actorId, expiresAt])
+  @@map("admin_order_exports")
+}
+
+model AdminAuditLog {
+  id          String   @id @default(uuid())
+  actorId     String
+  action      String
+  targetType  String
+  targetCount Int      @default(0)
+  outcome     String
+  details     String   @default("{}")
+  createdAt   DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@map("admin_audit_logs")
 }
 
 model OrderItem {

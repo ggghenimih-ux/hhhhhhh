@@ -1,4 +1,4 @@
-import { Category, Product, Order, User } from '../types';
+import { Category, Product, Order } from '../types';
 
 export const CATEGORIES_DATA: Category[] = [
   {
@@ -933,24 +933,3 @@ export const DEMO_ORDERS: Order[] = [
     updatedAt: '2024-03-22T16:00:00Z'
   }
 ];
-
-export const DEMO_USER: User = {
-  id: 'usr-admin-demo',
-  firstName: 'Admin',
-  lastName: 'GSM',
-  email: 'admin@outils-gsm.tn',
-  phone: '+216 26 383 876',
-  isAdmin: true,
-  addresses: [
-    {
-      firstName: 'Service',
-      lastName: 'Technique',
-      phone: '+216 26 383 876',
-      governorate: 'Tunis',
-      city: 'Tunis Centre',
-      street: 'Tunis,tunis',
-      postalCode: '1000'
-    }
-  ],
-  createdAt: '2024-01-01T00:00:00Z'
-};

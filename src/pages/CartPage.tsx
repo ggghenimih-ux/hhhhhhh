@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { getSafeImageUrl, handleImageError } from '../utils/image';
+import { MAX_ORDER_QUANTITY } from '../utils/stock';
 import {
   ShoppingCart,
   Trash2,
@@ -27,6 +28,9 @@ export const CartPage: React.FC = () => {
     freeShippingThreshold,
     shippingFee,
     cartTotal,
+    couponCode,
+    setCouponCode,
+    discountRate,
     navigateTo,
     getLocalizedName,
     getProductPrice,
@@ -34,21 +38,17 @@ export const CartPage: React.FC = () => {
   } = useStore();
 
   const [coupon, setCoupon] = useState('');
-  const [discountAmount, setDiscountAmount] = useState(0);
+  const discountAmount = Math.round(cartSubtotal * discountRate * 1000) / 1000;
 
   const remainingForFreeShipping = Math.max(0, freeShippingThreshold - cartSubtotal);
   const isFreeShipping = cartSubtotal >= freeShippingThreshold;
-  const finalTotal = Math.max(0, cartSubtotal - discountAmount + shippingFee);
+  const finalTotal = cartTotal;
 
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
-    if (coupon.trim().toUpperCase() === 'GSM10') {
-      const disc = Math.round(cartSubtotal * 0.1 * 1000) / 1000;
-      setDiscountAmount(disc);
-      showToast('Code promo appliqué : -10% de réduction !', 'success');
+    if (coupon.trim()) {
+      setCouponCode(coupon);
       setCoupon('');
-    } else {
-      showToast('Code promo invalide. Essayez GSM10', 'error');
     }
   };
 
@@ -124,6 +124,9 @@ export const CartPage: React.FC = () => {
                 <img
                   src={img}
                   alt={name}
+                  loading="lazy"
+                  width={80}
+                  height={80}
                   onError={(e) => handleImageError(e)}
                   className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border border-slate-200 flex-shrink-0"
                 />
@@ -147,6 +150,7 @@ export const CartPage: React.FC = () => {
                 <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50 p-1">
                   <button
                     onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.selectedVariant?.id)}
+                    aria-label={`Diminuer la quantité de ${name}`}
                     className="p-1.5 hover:bg-white text-slate-600 transition"
                   >
                     <Minus className="w-3.5 h-3.5" />
@@ -156,8 +160,9 @@ export const CartPage: React.FC = () => {
                   </span>
                   <button
                     onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.selectedVariant?.id)}
+                    aria-label={`Augmenter la quantité de ${name}`}
                     className="p-1.5 hover:bg-white text-slate-600 transition"
-                    disabled={item.quantity >= (item.product.stock || 999)}
+                    disabled={item.quantity >= MAX_ORDER_QUANTITY}
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
@@ -170,6 +175,7 @@ export const CartPage: React.FC = () => {
                   </strong>
                   <button
                     onClick={() => removeFromCart(item.product.id, item.selectedVariant?.id)}
+                    aria-label={`Supprimer ${name} du panier`}
                     className="text-slate-400 hover:text-rose-600 text-xs mt-1"
                     title="Supprimer"
                   >
@@ -189,7 +195,9 @@ export const CartPage: React.FC = () => {
 
           {/* Coupon */}
           <form onSubmit={handleApplyCoupon} className="flex gap-2">
+            <label htmlFor="cart-page-coupon" className="sr-only">Code promo</label>
             <input
+              id="cart-page-coupon"
               type="text"
               value={coupon}
               onChange={(e) => setCoupon(e.target.value)}

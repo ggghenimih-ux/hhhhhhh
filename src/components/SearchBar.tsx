@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useStore } from '../context/StoreContext';
+import { useStoreProducts, useStoreRouting, useStoreSettings } from '../context/StoreSlices';
 import { Search, X, ChevronRight } from 'lucide-react';
 import { Product } from '../types';
 
@@ -9,18 +9,9 @@ interface SearchBarProps {
 }
 
 export const SearchBar: React.FC<SearchBarProps> = ({ className = '', onSearchSubmitted }) => {
-  const {
-    t,
-    language,
-    filters,
-    setFilters,
-    products,
-    getLocalizedName,
-    formatPrice,
-    getProductPrice,
-    setDetailProduct,
-    navigateTo,
-  } = useStore();
+  const { t, language, formatPrice } = useStoreSettings();
+  const { filters, setFilters, products, getLocalizedName, getProductPrice } = useStoreProducts();
+  const { navigateTo } = useStoreRouting();
 
   const [query, setQuery] = useState(filters.searchQuery || '');
   const [isOpen, setIsOpen] = useState(false);
@@ -88,7 +79,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ className = '', onSearchSu
 
   const handleSelectProduct = (product: Product) => {
     setIsOpen(false);
-    setDetailProduct(product);
+    navigateTo('product-detail', { productSlug: product.slug, productId: product.id });
   };
 
   return (
@@ -153,6 +144,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({ className = '', onSearchSu
                       <img
                         src={image.trim()}
                         alt={name}
+                        loading="lazy"
+                        width={48}
+                        height={48}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';

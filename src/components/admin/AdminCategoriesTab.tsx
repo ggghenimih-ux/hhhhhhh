@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { api } from '../../services/api';
+import { useDialogAccessibility } from '../../hooks/useDialogAccessibility';
 import {
   FolderTree,
   Plus,
@@ -26,6 +27,7 @@ export const AdminCategoriesTab: React.FC<AdminCategoriesTabProps> = ({ onRefres
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any | null>(null);
+  const dialogRef = useDialogAccessibility(isModalOpen, () => setIsModalOpen(false));
 
   // Form Fields
   const [formName, setFormName] = useState('');
@@ -149,6 +151,7 @@ export const AdminCategoriesTab: React.FC<AdminCategoriesTabProps> = ({ onRefres
         <div className="flex items-center gap-2">
           <button
             onClick={fetchCategories}
+            aria-label="Actualiser les catégories"
             className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition"
             title="Actualiser"
           >
@@ -233,6 +236,7 @@ export const AdminCategoriesTab: React.FC<AdminCategoriesTabProps> = ({ onRefres
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(cat)}
+                            aria-label={`Modifier ${catName}`}
                             className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
                             title="Modifier"
                           >
@@ -241,6 +245,7 @@ export const AdminCategoriesTab: React.FC<AdminCategoriesTabProps> = ({ onRefres
                           <button
                             type="button"
                             onClick={() => handleDelete(cat.id, catName)}
+                            aria-label={`Supprimer ${catName}`}
                             className="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition"
                             title="Supprimer"
                           >
@@ -260,7 +265,14 @@ export const AdminCategoriesTab: React.FC<AdminCategoriesTabProps> = ({ onRefres
       {/* CREATE / EDIT CATEGORY MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={editingCategory ? 'Modifier une catégorie' : 'Nouvelle catégorie'}
+            tabIndex={-1}
+            className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col"
+          >
             <div className="p-5 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FolderTree className="w-5 h-5 text-orange-400" />
@@ -270,6 +282,7 @@ export const AdminCategoriesTab: React.FC<AdminCategoriesTabProps> = ({ onRefres
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
+                aria-label="Fermer la fenêtre"
                 className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition"
               >
                 <X className="w-5 h-5" />
@@ -278,8 +291,9 @@ export const AdminCategoriesTab: React.FC<AdminCategoriesTabProps> = ({ onRefres
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Nom de la Catégorie *</label>
+                <label htmlFor="category-name" className="font-bold text-slate-700 block mb-1">Nom de la Catégorie *</label>
                 <input
+                  id="category-name"
                   type="text"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
@@ -290,8 +304,9 @@ export const AdminCategoriesTab: React.FC<AdminCategoriesTabProps> = ({ onRefres
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Slug URL</label>
+                <label htmlFor="category-slug" className="font-bold text-slate-700 block mb-1">Slug URL</label>
                 <input
+                  id="category-slug"
                   type="text"
                   value={formSlug}
                   onChange={(e) => setFormSlug(e.target.value)}
@@ -301,8 +316,9 @@ export const AdminCategoriesTab: React.FC<AdminCategoriesTabProps> = ({ onRefres
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Ordre d'affichage</label>
+                <label htmlFor="category-order" className="font-bold text-slate-700 block mb-1">Ordre d'affichage</label>
                 <input
+                  id="category-order"
                   type="number"
                   value={formOrder}
                   onChange={(e) => setFormOrder(Number(e.target.value))}
@@ -311,8 +327,9 @@ export const AdminCategoriesTab: React.FC<AdminCategoriesTabProps> = ({ onRefres
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Description courte</label>
+                <label htmlFor="category-description" className="font-bold text-slate-700 block mb-1">Description courte</label>
                 <textarea
+                  id="category-description"
                   rows={2}
                   value={formDesc}
                   onChange={(e) => setFormDesc(e.target.value)}

@@ -1,13 +1,14 @@
 import React from 'react';
-import { useStore } from '../context/StoreContext';
+import { useStoreRouting, useStoreSettings } from '../context/StoreSlices';
 import { Phone, MapPin, Truck, ShieldCheck, Mail, Clock, MessageCircle } from 'lucide-react';
 import { Logo } from './Logo';
 
 export const Footer: React.FC = () => {
-  const { language, navigateTo, setIsTrackOrderModalOpen, setIsAuthModalOpen, settings } = useStore();
+  const { language, settings } = useStoreSettings();
+  const { navigateTo } = useStoreRouting();
 
-  const phone = settings?.phone || '+216 26 383 876';
-  const whatsapp = settings?.whatsapp || '+216 26 383 876';
+  const phone = settings.phone;
+  const whatsapp = settings.whatsapp || settings.phone;
   const email = settings?.email || 'contact@reparation-gsm.tn';
   const address = settings?.address || 'Tunis,tunis';
   const workingHours = settings?.workingHours || 'Mar - Dim: 08:00 - 18:00 | Lundi: Fermé';
@@ -112,7 +113,7 @@ export const Footer: React.FC = () => {
               <li>
                 <button
                   type="button"
-                  onClick={() => setIsTrackOrderModalOpen(true)}
+                  onClick={() => navigateTo('track-order')}
                   className="hover:text-white transition"
                 >
                   {language === 'ar' ? 'تتبع طلبيتك' : 'Suivre ma commande'}
@@ -121,7 +122,7 @@ export const Footer: React.FC = () => {
               <li>
                 <button
                   type="button"
-                  onClick={() => setIsAuthModalOpen(true)}
+                  onClick={() => navigateTo('login')}
                   className="hover:text-white transition"
                 >
                   {language === 'ar' ? 'حسابي / تسجيل الدخول' : 'Mon Compte / Connexion'}

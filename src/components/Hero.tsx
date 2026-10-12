@@ -6,7 +6,7 @@ export const Hero: React.FC = () => {
   const { language, navigateTo, settings } = useStore();
 
   const title = settings?.heroTitle || (language === 'ar' ? 'معدات وأدوات صيانة الهواتف الذكية للمحترفين' : 'Outillage & Équipements Professionnels GSM en Tunisie');
-  const subtitle = settings?.heroSubtitle || (language === 'ar' ? 'محطات لحام دقيقة، ميكروسكوبات ثلاثية العيون، مبرمجات سوفتوير، ومزودات طاقة أصلية مع توصيل سريع 24/48 ساعة وضمان حقيقي.' : 'Stations de soudure haute précision, microscopes trinoculaires, programmeurs JCID et pièces certifiées en stock avec livraison rapide.');
+  const subtitle = settings?.heroSubtitle || (language === 'ar' ? 'محطات لحام دقيقة، ميكروسكوبات ثلاثية العيون، مبرمجات سوفتوير، ومزودات طاقة أصلية مع توصيل سريع 24/48 ساعة وضمان حقيقي.' : 'Stations de soudure haute précision, microscopes trinoculaires, programmeurs JCID et pièces certifiées avec livraison rapide.');
   const buttonText = settings?.heroButtonText || (language === 'ar' ? 'عرض جميع المنتجات' : 'Voir tout le catalogue');
   const buttonLink = settings?.heroButtonLink || 'products';
   const logoOrHeroImg = settings?.heroImage?.trim() || settings?.logoUrl?.trim() || '/logo.jpg';
@@ -115,4 +115,3 @@ export const Hero: React.FC = () => {
     </section>
   );
 };
-

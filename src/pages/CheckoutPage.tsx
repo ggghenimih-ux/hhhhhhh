@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import { useStore } from '../context/StoreContext';
+import {
+  useStoreCart,
+  useStoreNotifications,
+  useStoreRouting,
+  useStoreSettings,
+} from '../context/StoreSlices';
 import { CONFIG } from '../config/index';
 import confetti from 'canvas-confetti';
 import {
@@ -16,19 +21,17 @@ import {
 } from 'lucide-react';
 
 export const CheckoutPage: React.FC = () => {
+  const { t, language, formatPrice } = useStoreSettings();
   const {
-    t,
-    language,
-    formatPrice,
     cart,
     cartSubtotal,
     freeShippingThreshold,
     shippingFee,
     cartTotal,
     createOrder,
-    navigateTo,
-    showToast,
-  } = useStore();
+  } = useStoreCart();
+  const { navigateTo } = useStoreRouting();
+  const { showToast } = useStoreNotifications();
 
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -126,10 +129,11 @@ export const CheckoutPage: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                <label htmlFor="checkout-name" className="text-xs font-semibold text-slate-700 block mb-1">
                   Nom et Prénom *
                 </label>
                 <input
+                  id="checkout-name"
                   type="text"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
@@ -140,10 +144,11 @@ export const CheckoutPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                <label htmlFor="checkout-phone" className="text-xs font-semibold text-slate-700 block mb-1">
                   Téléphone Tunisien (8 chiffres) *
                 </label>
                 <input
+                  id="checkout-phone"
                   type="tel"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
@@ -155,10 +160,11 @@ export const CheckoutPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
+              <label htmlFor="checkout-email" className="text-xs font-semibold text-slate-700 block mb-1">
                 Adresse Email (optionnel pour facture pro-forma)
               </label>
               <input
+                id="checkout-email"
                 type="email"
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
@@ -177,27 +183,29 @@ export const CheckoutPage: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                <label htmlFor="checkout-governorate" className="text-xs font-semibold text-slate-700 block mb-1">
                   Gouvernorat (ولاية) *
                 </label>
                 <select
+                  id="checkout-governorate"
                   value={governorate}
                   onChange={(e) => setGovernorate(e.target.value)}
                   className="w-full text-xs p-3 rounded-xl border border-slate-200 outline-none focus:border-orange-500 bg-white"
                 >
                   {CONFIG.store.governorates.map((gov) => (
                     <option key={gov.id} value={gov.nameFr}>
-                      {gov.nameFr} ({gov.nameAr}) - {gov.fee.toFixed(3)} DT
+                      {gov.nameFr} ({gov.nameAr})
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                <label htmlFor="checkout-delegation" className="text-xs font-semibold text-slate-700 block mb-1">
                   Mégadélégation / Ville
                 </label>
                 <input
+                  id="checkout-delegation"
                   type="text"
                   value={delegation}
                   onChange={(e) => setDelegation(e.target.value)}
@@ -208,10 +216,11 @@ export const CheckoutPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
+              <label htmlFor="checkout-address" className="text-xs font-semibold text-slate-700 block mb-1">
                 Adresse Complète (Rue, Atelier, Immeuble, Étage) *
               </label>
               <input
+                id="checkout-address"
                 type="text"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
@@ -222,10 +231,11 @@ export const CheckoutPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
+              <label htmlFor="checkout-notes" className="text-xs font-semibold text-slate-700 block mb-1">
                 Instructions particulières pour le livreur
               </label>
               <input
+                id="checkout-notes"
                 type="text"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -252,6 +262,7 @@ export const CheckoutPage: React.FC = () => {
                 }`}
               >
                 <input
+                  id="payment-cod"
                   type="radio"
                   checked={paymentMethod === 'cod'}
                   onChange={() => setPaymentMethod('cod')}
@@ -274,6 +285,7 @@ export const CheckoutPage: React.FC = () => {
                 }`}
               >
                 <input
+                  id="payment-bank-transfer"
                   type="radio"
                   checked={paymentMethod === 'bank_transfer'}
                   onChange={() => setPaymentMethod('bank_transfer')}
@@ -316,7 +328,7 @@ export const CheckoutPage: React.FC = () => {
               <strong className="text-slate-900">{formatPrice(cartSubtotal)}</strong>
             </div>
             <div className="flex justify-between">
-              <span>Frais de livraison ({governorate})</span>
+              <span>Frais de livraison</span>
               <strong className={isFreeShipping ? 'text-emerald-600' : 'text-slate-900'}>
                 {isFreeShipping ? t.free : formatPrice(shippingFee)}
               </strong>

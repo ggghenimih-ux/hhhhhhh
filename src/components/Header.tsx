@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { useStore } from '../context/StoreContext';
+import { useStoreCart, useStoreRouting, useStoreSettings } from '../context/StoreSlices';
+import { useAuth } from '../context/AuthContext';
 import {
   ShoppingCart,
   User as UserIcon,
   Menu,
   Phone,
   Truck,
-  CheckCircle2
+  CheckCircle2,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { SearchBar } from './SearchBar';
@@ -14,28 +15,23 @@ import { CategoryNav } from './CategoryNav';
 import { MobileMenu } from './MobileMenu';
 
 export const Header: React.FC = () => {
-  const {
-    t,
-    language,
-    setLanguage,
-    cartCount,
-    setIsCartDrawerOpen,
-    setIsAuthModalOpen,
-    user,
-    navigateTo,
-    settings,
-  } = useStore();
-
+  const { language, setLanguage, settings, t } = useStoreSettings();
+  const { cartCount, setIsCartDrawerOpen } = useStoreCart();
+  const { currentRoute, navigateTo } = useStoreRouting();
+  const { user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const displayPhone = settings?.phone || '+216 26 383 876';
+  const isAdminRoute = currentRoute.startsWith('admin');
+
+  const handleAccountClick = () => {
+    navigateTo(user ? 'profile' : 'login');
+  };
 
   return (
     <>
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
-        {/* 1. TOP BAR (شريط علوي صغير للمعلومات المهمة) */}
         <div className="bg-slate-900 text-slate-300 text-xs py-1.5 border-b border-slate-800">
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
-            {/* Delivery & Cash on delivery notices */}
             <div className="flex items-center gap-3 sm:gap-6 flex-wrap text-[11px] sm:text-xs">
               <span className="flex items-center gap-1.5 text-slate-300 font-medium">
                 <Truck className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
@@ -56,7 +52,6 @@ export const Header: React.FC = () => {
               </span>
             </div>
 
-            {/* Phone hotline & language switch */}
             <div className="flex items-center gap-4 flex-shrink-0 text-[11px] sm:text-xs">
               <a
                 href={`tel:${displayPhone.replace(/[\s\-\(\)]/g, '')}`}
@@ -67,7 +62,6 @@ export const Header: React.FC = () => {
                 <span>{displayPhone}</span>
               </a>
 
-              {/* Language Switcher */}
               <div className="flex items-center gap-1 border-l border-slate-700 pl-3">
                 <button
                   type="button"
@@ -97,10 +91,8 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* 2. MAIN HEADER BAR */}
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between gap-4">
-            {/* Mobile Menu Button + Logo */}
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -114,15 +106,12 @@ export const Header: React.FC = () => {
               <Logo size="md" />
             </div>
 
-            {/* Desktop Search Bar (Centered) */}
             <div className="hidden lg:block flex-1 max-w-xl mx-8">
               <SearchBar />
             </div>
 
-            {/* Account & Cart Actions */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Admin Dashboard shortcut if admin */}
-              {user?.isAdmin && (
+              {user?.role === 'ADMIN' && (
                 <button
                   type="button"
                   onClick={() => navigateTo('admin')}
@@ -132,16 +121,9 @@ export const Header: React.FC = () => {
                 </button>
               )}
 
-              {/* Account Button */}
               <button
                 type="button"
-                onClick={() => {
-                  if (user) {
-                    navigateTo('profile');
-                  } else {
-                    setIsAuthModalOpen(true);
-                  }
-                }}
+                onClick={handleAccountClick}
                 className="hidden sm:flex items-center gap-2 px-3 py-2 text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-lg text-xs font-semibold transition"
                 title={user ? (user.firstName || user.name || 'Compte') : t.account}
               >
@@ -151,8 +133,7 @@ export const Header: React.FC = () => {
                 </span>
               </button>
 
-              {/* Cart Button */}
-              <button
+              {!isAdminRoute && <button
                 type="button"
                 onClick={() => setIsCartDrawerOpen(true)}
                 className="relative flex items-center gap-2 px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-900 rounded-lg text-xs font-bold transition border border-orange-200"
@@ -167,21 +148,18 @@ export const Header: React.FC = () => {
                   )}
                 </div>
                 <span className="hidden sm:inline">{t.cart || 'Panier'}</span>
-              </button>
+              </button>}
             </div>
           </div>
 
-          {/* Mobile Search Row (Row 2 on Mobile - full width, max 2 rows total) */}
           <div className="mt-2.5 lg:hidden">
             <SearchBar />
           </div>
         </div>
 
-        {/* 3. CATEGORY NAVIGATION BAR (Desktop / Tablet) */}
         <CategoryNav />
       </header>
 
-      {/* Mobile Drawer Navigation */}
       <MobileMenu
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
@@ -189,3 +167,5 @@ export const Header: React.FC = () => {
     </>
   );
 };
+
+export default Header;

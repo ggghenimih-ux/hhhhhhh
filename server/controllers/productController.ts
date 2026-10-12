@@ -1,6 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../db/client';
-import { ProductSchema } from '../validators/schemas';
+import {
+  ProductSchema,
+  ProductUpdateSchema,
+  ProductStatusSchema,
+  ProductStockSchema,
+} from '../validators/schemas';
 
 // Helper to generate URL-safe slugs
 function slugify(text: string): string {
@@ -308,21 +313,21 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
 export const updateProduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const body = req.body;
+    const body = ProductUpdateSchema.parse(req.body);
 
     const dataToUpdate: any = {};
     if (body.name !== undefined) dataToUpdate.name = body.name;
     if (body.slug !== undefined && body.slug.trim()) dataToUpdate.slug = slugify(body.slug);
     if (body.shortDescription !== undefined) dataToUpdate.shortDescription = body.shortDescription;
     if (body.description !== undefined) dataToUpdate.description = body.description;
-    if (body.priceTND !== undefined) dataToUpdate.priceTND = parseFloat(body.priceTND);
+    if (body.priceTND !== undefined) dataToUpdate.priceTND = body.priceTND;
     if (body.compareAtPriceTND !== undefined)
-      dataToUpdate.compareAtPriceTND = body.compareAtPriceTND ? parseFloat(body.compareAtPriceTND) : null;
+      dataToUpdate.compareAtPriceTND = body.compareAtPriceTND;
     if (body.category !== undefined) dataToUpdate.category = body.category;
     if (body.image !== undefined) dataToUpdate.image = body.image;
     if (body.images !== undefined) dataToUpdate.images = JSON.stringify(body.images);
-    if (body.stock !== undefined) dataToUpdate.stock = parseInt(body.stock, 10);
-    if (body.lowStockThreshold !== undefined) dataToUpdate.lowStockThreshold = parseInt(body.lowStockThreshold, 10);
+    if (body.stock !== undefined) dataToUpdate.stock = body.stock;
+    if (body.lowStockThreshold !== undefined) dataToUpdate.lowStockThreshold = body.lowStockThreshold;
     if (body.sku !== undefined) dataToUpdate.sku = body.sku;
     if (body.brand !== undefined) dataToUpdate.brand = body.brand;
     if (body.warranty !== undefined) dataToUpdate.warranty = body.warranty;
@@ -357,45 +362,49 @@ export const deleteProduct = async (req: Request, res: Response, next: NextFunct
       });
     }
 
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: {
-        orderItems: {
-          select: { id: true },
-          take: 1,
+    const result = await prisma.$transaction(async (tx) => {
+      const product = await tx.product.findUnique({
+        where: { id },
+        include: {
+          orderItems: {
+            select: { id: true },
+            take: 1,
+          },
         },
-      },
+      });
+
+      if (!product) return { kind: 'not-found' as const };
+
+      if (product.orderItems.length > 0) {
+        const updatedProduct = await tx.product.update({
+          where: { id },
+          data: {
+            isActive: false,
+            deletedAt: new Date(),
+          },
+        });
+        return { kind: 'soft-deleted' as const, product: updatedProduct };
+      }
+
+      await tx.product.delete({ where: { id } });
+      return { kind: 'deleted' as const };
     });
 
-    if (!product) {
+    if (result.kind === 'not-found') {
       return res.status(404).json({
         error: 'NotFound',
         message: 'المنتج غير موجود',
       });
     }
 
-    if (product.orderItems && product.orderItems.length > 0) {
-      // Soft delete: Product is linked to previous customer orders!
-      const updatedProduct = await prisma.product.update({
-        where: { id },
-        data: {
-          isActive: false,
-          deletedAt: new Date(),
-        },
-      });
-
+    if (result.kind === 'soft-deleted') {
       return res.status(200).json({
         success: true,
         message: 'المنتج مرتبط بطلبات سابقة وتم إخفاؤه بدل حذفه',
-        product: updatedProduct,
+        product: result.product,
         softDeleted: true,
       });
     }
-
-    // Hard delete if not linked to any order
-    await prisma.product.delete({
-      where: { id },
-    });
 
     return res.status(200).json({
       success: true,
@@ -411,7 +420,7 @@ export const deleteProduct = async (req: Request, res: Response, next: NextFunct
 export const patchProductStatus = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { isActive } = req.body;
+    const { isActive } = ProductStatusSchema.parse(req.body);
 
     const existing = await prisma.product.findUnique({ where: { id } });
     if (!existing) {
@@ -441,18 +450,11 @@ export const patchProductStatus = async (req: Request, res: Response, next: Next
 export const patchProductStock = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { stock } = req.body;
-
-    if (stock === undefined || isNaN(Number(stock)) || Number(stock) < 0) {
-      return res.status(400).json({
-        error: 'BadRequest',
-        message: 'La quantité en stock doit être un entier positif ou zéro.',
-      });
-    }
+    const { stock } = ProductStockSchema.parse(req.body);
 
     const updated = await prisma.product.update({
       where: { id },
-      data: { stock: parseInt(stock, 10) },
+      data: { stock },
     });
 
     res.json({

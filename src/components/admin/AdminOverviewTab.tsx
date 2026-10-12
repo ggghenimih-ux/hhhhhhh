@@ -5,7 +5,6 @@ import {
   TrendingUp,
   ShoppingCart,
   Package,
-  AlertTriangle,
   ArrowRight,
   Settings,
   Plus,
@@ -21,6 +20,9 @@ interface AdminOverviewTabProps {
     totalOrders: number;
     totalRevenue: number;
     totalProducts: number;
+    catalogProducts?: number;
+    totalCategories?: number;
+    deliveredOrders?: number;
     lowStockProducts: number;
     recentOrders?: any[];
   };
@@ -33,17 +35,13 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
   onNavigateTab,
   onRefreshData,
 }) => {
-  const { formatPrice, products, getLocalizedName } = useStore();
+  const { formatPrice } = useStore();
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
-
-  // Products with low stock
-  const lowStockList = products.filter((p) => (p.stock ?? 0) <= 5);
 
   return (
     <div className="space-y-8">
-      {/* 4 Primary Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Revenue */}
+      {/* Key sales, order, and catalog metrics */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
             <TrendingUp className="w-6 h-6" />
@@ -58,7 +56,6 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
           </div>
         </div>
 
-        {/* Total Orders */}
         <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
             <ShoppingCart className="w-6 h-6" />
@@ -71,7 +68,6 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
           </div>
         </div>
 
-        {/* Active Products */}
         <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0">
             <Package className="w-6 h-6" />
@@ -84,18 +80,32 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
           </div>
         </div>
 
-        {/* Low Stock Alert */}
         <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0">
-            <AlertTriangle className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 className="w-6 h-6" />
           </div>
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-              Alerte Stock Faible
+              Commandes Livrées
             </span>
-            <strong className="text-xl font-black text-rose-600">{stats.lowStockProducts}</strong>
+            <strong className="text-xl font-black text-slate-900">{stats.deliveredOrders || 0}</strong>
           </div>
         </div>
+
+        <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-cyan-100 text-cyan-600 flex items-center justify-center flex-shrink-0">
+            <Package className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+              Catalogue / Catégories
+            </span>
+            <strong className="text-xl font-black text-slate-900">
+              {stats.catalogProducts ?? stats.totalProducts} / {stats.totalCategories || 0}
+            </strong>
+          </div>
+        </div>
+
       </div>
 
       {/* Quick Action Shortcuts */}
@@ -126,9 +136,9 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
           <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
             <Plus className="w-5 h-5" />
           </div>
-          <h3 className="font-bold text-sm text-slate-900">Catalogue & Stocks</h3>
+          <h3 className="font-bold text-sm text-slate-900">Catalogue Produits</h3>
           <p className="text-xs text-slate-500">
-            Ajoutez de nouveaux équipements GSM, ajustez les prix et gérez les ruptures.
+            Ajoutez de nouveaux équipements GSM et ajustez les prix.
           </p>
           <div className="text-xs font-bold text-orange-600 flex items-center gap-1 pt-1 group-hover:translate-x-1 transition-transform">
             <span>Gérer les produits</span>
@@ -154,51 +164,6 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
           </div>
         </button>
       </div>
-
-      {/* Low Stock Warning Section */}
-      {lowStockList.length > 0 && (
-        <div className="bg-rose-50/60 rounded-3xl border border-rose-200 p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-rose-600" />
-              <h3 className="text-sm font-bold text-rose-950">
-                Alerte Réapprovisionnement ({lowStockList.length} produit(s) en stock critique)
-              </h3>
-            </div>
-            <button
-              onClick={() => onNavigateTab('products')}
-              className="text-xs font-bold text-rose-700 hover:underline"
-            >
-              Voir tout l'inventaire
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-            {lowStockList.slice(0, 6).map((prod) => (
-              <div
-                key={prod.id}
-                className="bg-white p-3.5 rounded-2xl border border-rose-100 flex items-center justify-between shadow-2xs"
-              >
-                <div className="min-w-0 pr-2">
-                  <span className="font-bold text-slate-900 block truncate">{getLocalizedName(prod)}</span>
-                  <span className="text-[11px] text-slate-400 font-mono">
-                    SKU: {prod.sku || 'N/A'}
-                  </span>
-                </div>
-                <span
-                  className={`px-2.5 py-1 rounded-lg font-mono font-bold text-xs flex-shrink-0 ${
-                    (prod.stock ?? 0) <= 0
-                      ? 'bg-rose-100 text-rose-800'
-                      : 'bg-amber-100 text-amber-800'
-                  }`}
-                >
-                  {(prod.stock ?? 0) <= 0 ? 'Épuisé (0)' : `${prod.stock} restants`}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Recent Orders Overview */}
       {stats.recentOrders && stats.recentOrders.length > 0 && (

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useStore } from '../../context/StoreContext';
 import { X, Printer, CheckCircle2 } from 'lucide-react';
+import { useDialogAccessibility } from '../../hooks/useDialogAccessibility';
 
 interface AdminInvoiceModalProps {
   order: any | null;
@@ -9,6 +10,7 @@ interface AdminInvoiceModalProps {
 
 export const AdminInvoiceModal: React.FC<AdminInvoiceModalProps> = ({ order, onClose }) => {
   const { settings, formatPrice } = useStore();
+  const dialogRef = useDialogAccessibility(Boolean(order), onClose);
 
   if (!order) return null;
 
@@ -17,7 +19,7 @@ export const AdminInvoiceModal: React.FC<AdminInvoiceModalProps> = ({ order, onC
   };
 
   const storeName = settings?.storeName || 'Outils Réparation GSM Tunisie';
-  const storePhone = settings?.phone || '+216 26 383 876';
+  const storePhone = settings.phone;
   const storeEmail = settings?.email || 'contact@reparation-gsm.tn';
   const storeAddress = settings?.address || 'Tunis,tunis';
   const logoUrl = settings?.logoUrl?.trim() || '/logo.jpg';
@@ -33,7 +35,14 @@ export const AdminInvoiceModal: React.FC<AdminInvoiceModalProps> = ({ order, onC
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 print:p-0 print:bg-white print:static">
-      <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] print:max-h-none print:shadow-none print:border-none print:rounded-none">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Facture ${order.orderNumber}`}
+        tabIndex={-1}
+        className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] print:max-h-none print:shadow-none print:border-none print:rounded-none"
+      >
         {/* Modal Controls (Hidden in Print) */}
         <div className="p-4 bg-slate-900 text-white flex items-center justify-between print:hidden">
           <div className="flex items-center gap-2">
@@ -50,6 +59,7 @@ export const AdminInvoiceModal: React.FC<AdminInvoiceModalProps> = ({ order, onC
             </button>
             <button
               onClick={onClose}
+              aria-label="Fermer la facture"
               className="p-2 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white transition"
               title="Fermer"
             >

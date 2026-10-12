@@ -1,21 +1,23 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
+import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { StoreProvider, useStore } from './context/StoreContext';
 import { MainLayout } from './layouts/MainLayout';
 import { HomePage } from './pages/HomePage';
-import { ProductsPage } from './pages/ProductsPage';
-import { ProductDetailPage } from './pages/ProductDetailPage';
-import { CartPage } from './pages/CartPage';
-import { CheckoutPage } from './pages/CheckoutPage';
-import { OrderSuccessPage } from './pages/OrderSuccessPage';
-import { TrackOrderPage } from './pages/TrackOrderPage';
-import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { AdminLoginPage } from './pages/AdminLoginPage';
-import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { ProtectedAdminRoute } from './components/admin/ProtectedAdminRoute';
-import { NotFoundPage } from './pages/NotFoundPage';
+
+const ProductsPage = lazy(() => import('./pages/ProductsPage').then((module) => ({ default: module.ProductsPage })));
+const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage').then((module) => ({ default: module.ProductDetailPage })));
+const CartPage = lazy(() => import('./pages/CartPage').then((module) => ({ default: module.CartPage })));
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage').then((module) => ({ default: module.CheckoutPage })));
+const OrderSuccessPage = lazy(() => import('./pages/OrderSuccessPage').then((module) => ({ default: module.OrderSuccessPage })));
+const TrackOrderPage = lazy(() => import('./pages/TrackOrderPage').then((module) => ({ default: module.TrackOrderPage })));
+const LoginPage = lazy(() => import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then((module) => ({ default: module.ProfilePage })));
+const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage').then((module) => ({ default: module.AdminLoginPage })));
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage').then((module) => ({ default: module.AdminDashboardPage })));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((module) => ({ default: module.NotFoundPage })));
 
 const AppRouter: React.FC = () => {
   const { currentRoute } = useStore();
@@ -49,6 +51,8 @@ const AppRouter: React.FC = () => {
     case 'admin-products':
     case 'admin-categories':
     case 'admin-orders':
+    case 'admin-users':
+    case 'admin-media':
     case 'admin-settings':
       return (
         <ProtectedAdminRoute>
@@ -63,12 +67,22 @@ const AppRouter: React.FC = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <StoreProvider>
-        <MainLayout>
-          <AppRouter />
-        </MainLayout>
-      </StoreProvider>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <StoreProvider>
+          <MainLayout>
+            <Suspense
+              fallback={
+                <div className="min-h-[40vh] flex items-center justify-center" role="status" aria-live="polite">
+                  <span className="text-sm font-semibold text-slate-600">Chargement…</span>
+                </div>
+              }
+            >
+              <AppRouter />
+            </Suspense>
+          </MainLayout>
+        </StoreProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }

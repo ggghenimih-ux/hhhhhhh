@@ -6,8 +6,12 @@ coverage/
 *.log
 .env*
 !.env.example
+!.env.notifications.example
 
 # Local database & user uploads must never be committed
 prisma/*.db
 prisma/*.db-journal
 uploads/
+!public/uploads/
+!public/uploads/products/
+!public/uploads/products/**

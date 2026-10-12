@@ -22,8 +22,6 @@ export const AdminMediaTab: React.FC = () => {
       settings?.logoUrl?.trim(),
       settings?.faviconUrl?.trim(),
       settings?.heroImage?.trim(),
-      'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80',
     ].filter((item): item is string => Boolean(item && item !== ''));
     return list.length > 0 ? list : ['/logo.jpg'];
   });
@@ -112,6 +110,7 @@ export const AdminMediaTab: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleCopy(url)}
+                aria-label={copiedUrl === url ? 'Lien copié' : `Copier le lien ${url}`}
                 className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition flex-shrink-0"
                 title="Copier le lien"
               >
