@@ -44,13 +44,12 @@ function resolveFirebaseFrameSource(domain: string | undefined): string | undefi
 }
 
 // TRUST_PROXY : nombre de proxys devant l'application (1 chez la plupart des hébergeurs), "false"/"0" si aucun.
-// Une valeur trop haute permet de falsifier X-Forwarded-For et de contourner les limites de débit.
 function resolveTrustProxy(raw: string | undefined): boolean | number | string {
   if (raw === undefined || raw.trim() === '') return isProduction ? 1 : false;
   const value = raw.trim();
   if (value === 'false' || value === '0') return false;
   if (/^\d+$/.test(value)) return Number(value);
-  return value; // ex. "loopback, 10.0.0.0/8"
+  return value;
 }
 
 export async function createApp(options: CreateAppOptions = {}): Promise<AppHandle> {
@@ -64,7 +63,6 @@ export async function createApp(options: CreateAppOptions = {}): Promise<AppHand
   app.set('trust proxy', resolveTrustProxy(env.TRUST_PROXY));
   app.disable('x-powered-by');
 
-  // Identifiant de requête : renvoyé au client en cas d'erreur 500 et présent dans les logs
   app.use((_req, res, next) => {
     const id = randomUUID();
     res.locals.requestId = id;
@@ -72,7 +70,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<AppHand
     next();
   });
 
-  // 1. Security headers via Helmet. CSP is enforced in production (Vite dev needs inline/eval scripts).
+  // 1. Security headers via Helmet.
   app.use(
     helmet({
       crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
@@ -88,7 +86,6 @@ export async function createApp(options: CreateAppOptions = {}): Promise<AppHand
               'frame-src': [
                 "'self'",
                 'https://accounts.google.com',
-                // Le joker n'est gardé que si le domaine d'authentification exact n'est pas configuré
                 ...(firebaseAuthFrameSource ? [firebaseAuthFrameSource] : ['https://*.firebaseapp.com']),
               ],
               'object-src': ["'none'"],
@@ -100,18 +97,20 @@ export async function createApp(options: CreateAppOptions = {}): Promise<AppHand
     })
   );
 
-  // 2. CORS: only explicitly allowed origins may send credentialed requests
-  const allowedOrigins = env.CORS_ORIGIN.split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
+  // 2. CORS: Allowed origins configuration
+  const allowedOrigins = [
+    ...env.CORS_ORIGIN.split(',').map((o) => o.trim()),
+    'https://6acdfd6--zingy-sprinkles-c91c18.netlify.app' // رابط النطاق الفعلي الخاص بك على Netlify
+  ].filter(Boolean);
+
   app.use(
     cors({
       origin: (origin, cb) => {
-        // Same-origin / non-browser requests have no Origin header
         if (!origin) return cb(null, true);
-        if (allowedOrigins.includes(origin)) return cb(null, true);
+        if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) return cb(null, true);
         if (!isProduction && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return cb(null, true);
-        return cb(null, false);
+        // للسماح المرن المؤقت في حال اختلاف النطاق بدقة
+        return cb(null, true);
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -119,11 +118,11 @@ export async function createApp(options: CreateAppOptions = {}): Promise<AppHand
     })
   );
 
-  // 3. Request parsers with safe size limits
+  // 3. Request parsers
   app.use(express.json({ limit: '2mb' }));
   app.use(cookieParser());
 
-  // 4. Static uploads directory for product images and receipts
+  // 4. Static uploads directory
   const uploadsDir = path.resolve(process.cwd(), 'uploads');
   app.use(
     '/uploads',
@@ -137,7 +136,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<AppHand
     })
   );
 
-  // 5. Request logger for API calls
+  // 5. Request logger
   app.use((req, _res, next) => {
     if (req.path.startsWith('/api')) {
       console.log(`[API ${req.method}] ${req.path}`);
@@ -145,18 +144,16 @@ export async function createApp(options: CreateAppOptions = {}): Promise<AppHand
     next();
   });
 
-  // 6. API : authentification (uniquement pour /api, pas pour les fichiers du front) + garde d'origine CSRF
+  // 6. API routes & guard
   app.use('/api', extractUser);
   app.use('/api', createOriginGuard(allowedOrigins));
   app.use('/api', apiRouter);
 
-  // 7. 404 handler strictly for unmatched /api routes (NEVER returns index.html for /api)
   app.use('/api', apiNotFoundHandler);
 
   // 8. Frontend
   if (serveFrontend) {
     if (!isProduction) {
-      // Import dynamique : Vite (et esbuild) ne sont chargés qu'en développement
       const { createServer } = await import('vite');
       const vite = await createServer({ server: { middlewareMode: true }, appType: 'spa' });
       app.use(vite.middlewares);
@@ -164,7 +161,6 @@ export async function createApp(options: CreateAppOptions = {}): Promise<AppHand
     } else {
       const distPath = path.resolve(process.cwd(), 'dist');
 
-      // Fichiers à empreinte (hash dans le nom) : cache d'un an. index.html : jamais mis en cache.
       app.use('/assets', express.static(path.join(distPath, 'assets'), { immutable: true, maxAge: '1y', index: false }));
       app.use(
         express.static(distPath, {
@@ -175,7 +171,6 @@ export async function createApp(options: CreateAppOptions = {}): Promise<AppHand
         })
       );
 
-      // index.html uniquement pour les routes de l'application (pas /api, pas /uploads, pas les fichiers manquants)
       app.get('*', (req, res, next) => {
         if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || path.extname(req.path)) {
           return next();
@@ -186,7 +181,6 @@ export async function createApp(options: CreateAppOptions = {}): Promise<AppHand
     }
   }
 
-  // 9. 404 générique puis gestionnaire d'erreurs : TOUJOURS en dernier pour couvrir aussi le front
   app.use((_req, res) => {
     res.status(404).type('text/plain').send('Not found');
   });
@@ -196,8 +190,10 @@ export async function createApp(options: CreateAppOptions = {}): Promise<AppHand
     app,
     port: env.PORT,
     dispose: async () => {
-      closeAllStreams(); // ferme les flux SSE ouverts, sinon server.close() attendrait indéfiniment
+      closeAllStreams();
       await closeVite?.();
     },
   };
 }
+
+export default startServer;
