@@ -37,7 +37,11 @@ async function request<T = any>(endpoint: string, options: RequestInit = {}): Pr
     // localStorage might fail in restricted iframe sandbox
   }
 
-  const response = await fetch(endpoint, {
+  // دمج رابط الـ Backend تلقائياً بناءً على متغير البيئة في Vercel أو المحلي
+  const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+  const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
+
+  const response = await fetch(url, {
     ...options,
     headers,
     credentials: 'include', // Includes HttpOnly JWT cookie automatically
@@ -196,7 +200,8 @@ export const api = {
         // The HttpOnly cookie remains available when localStorage is restricted.
       }
 
-      const response = await fetch('/api/orders/admin/archive/export', {
+      const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+      const response = await fetch(`${baseUrl}/api/orders/admin/archive/export`, {
         method: 'POST',
         headers,
         credentials: 'include',
