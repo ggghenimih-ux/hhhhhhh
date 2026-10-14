@@ -58,6 +58,9 @@ async function authenticate(req: Request): Promise<AuthResult> {
     if (typeof raw === 'string') return { failure: 'invalid' };
     decoded = raw;
   } catch (err: any) {
+    // طباعة تفاصيل الخطأ بدقة لمعرفة سبب الـ 401 في سجلات السيرفر
+    console.error('[JWT Verify Error details]:', err?.message, err);
+
     if (err?.name === 'TokenExpiredError') return { failure: 'expired' };
     if (err?.name === 'JsonWebTokenError' || err?.name === 'NotBeforeError') return { failure: 'invalid' };
     throw err;
