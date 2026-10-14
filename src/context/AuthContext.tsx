@@ -6,7 +6,7 @@ import {
   GoogleAuthProvider,
   signOut as firebaseSignOut 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, setDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 
 interface UserType {
@@ -30,26 +30,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchUserData = async (firebaseUser: any) => {
+    let userData: UserType = {
+      id: firebaseUser.uid,
+      email: firebaseUser.email,
+      name: firebaseUser.displayName || 'User',
+      role: 'client'
+    };
+
+    try {
+      // البحث عن المستخدم في مجموعة users باستخدام البريد الإلكتروني لضمان المطابقة
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', firebaseUser.email));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0];
+        userData = { ...userData, id: userDoc.id, ...userDoc.data() };
+      } else {
+        // إذا لم يكن موجوداً، نقوم بإنشائه تلقائياً بدور client
+        const newUserRef = doc(db, 'users', firebaseUser.uid);
+        await setDoc(newUserRef, {
+          email: firebaseUser.email,
+          name: firebaseUser.displayName || 'User',
+          role: 'client',
+          createdAt: serverTimestamp()
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+    }
+
+    return userData;
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        let userData: UserType = {
-          id: firebaseUser.uid,
-          email: firebaseUser.email,
-          name: firebaseUser.displayName || 'User',
-          role: 'client'
-        };
-
-        try {
-          const userDocRef = doc(db, 'users', firebaseUser.uid);
-          const userDoc = await getDoc(userDocRef);
-          if (userDoc.exists()) {
-            userData = { ...userData, ...userDoc.data() };
-          }
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-        }
-
+        const userData = await fetchUserData(firebaseUser);
         setUser(userData);
       } else {
         setUser(null);
@@ -63,21 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const firebaseUser = userCredential.user;
-      
-      let userData: UserType = {
-        id: firebaseUser.uid,
-        email: firebaseUser.email,
-        name: firebaseUser.displayName || 'User',
-        role: 'client'
-      };
-
-      const userDocRef = doc(db, 'users', firebaseUser.uid);
-      const userDoc = await getDoc(userDocRef);
-      if (userDoc.exists()) {
-        userData = { ...userData, ...userDoc.data() };
-      }
-
+      const userData = await fetchUserData(userCredential.user);
       setUser(userData);
       return { success: true, user: userData };
     } catch (error: any) {
@@ -89,30 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
-
-      let userData: UserType = {
-        id: firebaseUser.uid,
-        email: firebaseUser.email,
-        name: firebaseUser.displayName || 'User',
-        role: 'client'
-      };
-
-      const userDocRef = doc(db, 'users', firebaseUser.uid);
-      const userDoc = await getDoc(userDocRef);
-      
-      if (userDoc.exists()) {
-        userData = { ...userData, ...userDoc.data() };
-      } else {
-        // إنشاء سجل للمستخدم الجديد في Firestore إذا لم يكن موجوداً
-        await setDoc(userDocRef, {
-          email: firebaseUser.email,
-          name: firebaseUser.displayName || 'User',
-          role: 'client',
-          createdAt: serverTimestamp()
-        });
-      }
-
+      const userData = await fetchUserData(result.user);
       setUser(userData);
       return { success: true, user: userData };
     } catch (error: any) {
