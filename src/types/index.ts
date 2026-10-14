@@ -225,7 +225,7 @@ export interface User {
   lastName?: string;
   email: string;
   phone: string;
-  role?: 'CUSTOMER' | 'ADMIN';
+  role?: 'CUSTOMER' | 'ADMIN' | 'TECHNICIEN';
   isAdmin?: boolean;
   avatar?: string;
   addresses?: any[];

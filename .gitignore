@@ -1,4 +1,6 @@
 node_modules/
+functions/lib/
+functions/node_modules/
 build/
 dist/
 coverage/

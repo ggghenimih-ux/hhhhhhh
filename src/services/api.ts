@@ -1,14 +1,25 @@
-/**
- * Central API Client for Outils Réparation GSM Tunisie
- * Performs real asynchronous HTTP requests to Express Backend endpoints
- */
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  deleteField,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
+import app, { auth, db } from './firebase';
 
 export interface ApiResponse<T = any> {
   success?: boolean;
   data?: T;
-  user?: any;
-  token?: string;
-  error?: string;
   message?: string;
   pagination?: {
     total: number;
@@ -19,339 +30,384 @@ export interface ApiResponse<T = any> {
   };
 }
 
-async function request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const headers = new Headers(options.headers || {});
-  
-  if (!(options.body instanceof FormData) && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json');
+type DocumentData = Record<string, any>;
+
+const asIsoStrings = (value: any): any => {
+  if (value && typeof value.toDate === 'function') return value.toDate().toISOString();
+  if (Array.isArray(value)) return value.map(asIsoStrings);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, asIsoStrings(item)]));
   }
+  return value;
+};
 
-  // Dual guarantee: If token is stored locally, always send Bearer header
-  // in case the browser blocks third-party iframe cookies
-  try {
-    const localToken = localStorage.getItem('gsm_token');
-    if (localToken && !headers.has('Authorization')) {
-      headers.set('Authorization', `Bearer ${localToken}`);
-    }
-  } catch {
-    // localStorage might fail in restricted iframe sandbox
-  }
+const documentData = (id: string, data: DocumentData) => ({
+  ...asIsoStrings(data),
+  id,
+});
 
-  // دمج رابط الـ Backend تلقائياً بناءً على متغير البيئة في Vercel أو المحلي
-  const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
-  const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
+const getCollection = async (name: string) => {
+  const snapshot = await getDocs(collection(db, name));
+  return snapshot.docs.map((item) => documentData(item.id, item.data()));
+};
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-    credentials: 'include', // Includes HttpOnly JWT cookie automatically
-  });
+const getProductWithReviews = async (id: string, data: DocumentData) => {
+  const reviewSnapshot = await getDocs(
+    query(collection(db, 'reviews'), where('productId', '==', id)),
+  );
+  const reviews = reviewSnapshot.docs
+    .map((item) => documentData(item.id, item.data()))
+    .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
+  return { ...documentData(id, data), reviews, reviewsCount: reviews.length };
+};
 
-  const isJson = response.headers.get('content-type')?.includes('application/json');
-  const data = isJson ? await response.json() : await response.text();
+const uploadImage = async (file: File) => {
+  if (!file.type.startsWith('image/')) throw new Error('Le fichier doit être une image.');
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+  const storageRef = ref(
+    getStorage(),
+    `images/${Date.now()}-${crypto.randomUUID()}-${safeName}`,
+  );
+  const uploaded = await uploadBytes(storageRef, file, { contentType: file.type });
+  return {
+    url: await getDownloadURL(uploaded.ref),
+    filename: uploaded.ref.name,
+  };
+};
 
-  if (!response.ok) {
-    const errorMsg = data?.message || data?.error || `Erreur serveur (${response.status})`;
-    const err = new Error(errorMsg) as any;
-    err.status = response.status;
-    err.data = data;
-    throw err;
-  }
+const getOrders = async () => {
+  const orders = await getCollection('orders');
+  return orders.filter((order) => !order.deletedAt);
+};
 
-  return data;
-}
+const archiveSelections = new Map<string, string[]>();
+const createOrderCallable = httpsCallable<DocumentData, ApiResponse<any>>(
+  getFunctions(app, 'europe-west1'),
+  'createOrder',
+);
+const dateIsInRange = (value: unknown, fromDate: string, toDate: string) => {
+  if (typeof value !== 'string') return false;
+  const date = value.slice(0, 10);
+  return date >= fromDate && date <= toDate;
+};
 
 export const api = {
-  // Products
   products: {
-    getAll: (params: Record<string, any> = {}) => {
-      const searchParams = new URLSearchParams();
-      Object.entries(params).forEach(([key, val]) => {
-        if (val !== undefined && val !== null && val !== '') {
-          searchParams.append(key, String(val));
-        }
-      });
-      const query = searchParams.toString();
-      return request<ApiResponse<any[]>>(`/api/products${query ? `?${query}` : ''}`);
-    },
-    getById: (id: string) => request<ApiResponse<any>>(`/api/products/${id}`),
-    getBySlug: (slug: string) => request<ApiResponse<any>>(`/api/products/slug/${slug}`),
-    create: (productData: any) =>
-      request<ApiResponse<any>>('/api/products', {
-        method: 'POST',
-        body: JSON.stringify(productData),
-      }),
-    update: (id: string, productData: any) =>
-      request<ApiResponse<any>>(`/api/products/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(productData),
-      }),
-    delete: (id: string) =>
-      request<ApiResponse<any> & { softDeleted?: boolean; deleted?: boolean }>(`/api/products/${id}`, {
-        method: 'DELETE',
-      }),
-    patchStatus: (id: string, isActive?: boolean) =>
-      request<ApiResponse<any>>(`/api/products/${id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ isActive }),
-      }),
-    toggleActive: (id: string, isActive?: boolean) =>
-      request<ApiResponse<any>>(`/api/products/${id}/toggle-active`, {
-        method: 'PATCH',
-        body: JSON.stringify({ isActive }),
-      }),
-    patchStock: (id: string, stock: number) =>
-      request<ApiResponse<any>>(`/api/products/${id}/stock`, {
-        method: 'PATCH',
-        body: JSON.stringify({ stock }),
-      }),
-    uploadImage: (id: string, file: File) => {
-      const formData = new FormData();
-      formData.append('image', file);
-      return request<ApiResponse<any>>(`/api/products/${id}/images`, {
-        method: 'POST',
-        body: formData,
-      });
-    },
-    deleteImage: (id: string, imageId: string) =>
-      request<ApiResponse<any>>(`/api/products/${id}/images/${encodeURIComponent(imageId)}`, {
-        method: 'DELETE',
-      }),
-  },
-
-  // Store Settings
-  settings: {
-    get: () => request<ApiResponse<any>>('/api/settings'),
-    update: (data: any) =>
-      request<ApiResponse<any>>('/api/settings', {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
-    uploadLogo: (file: File) => {
-      const formData = new FormData();
-      formData.append('image', file);
-      return request<ApiResponse<any>>('/api/settings/logo', {
-        method: 'POST',
-        body: formData,
-      });
-    },
-    uploadFavicon: (file: File) => {
-      const formData = new FormData();
-      formData.append('image', file);
-      return request<ApiResponse<any>>('/api/settings/favicon', {
-        method: 'POST',
-        body: formData,
-      });
-    },
-  },
-
-  // Categories
-  categories: {
-    getAll: () => request<ApiResponse<any[]>>('/api/categories'),
-    create: (data: any) =>
-      request<ApiResponse<any>>('/api/categories', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-    update: (id: string, data: any) =>
-      request<ApiResponse<any>>(`/api/categories/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
-    delete: (id: string) =>
-      request<ApiResponse<any>>(`/api/categories/${id}`, {
-        method: 'DELETE',
-      }),
-  },
-
-  // Orders
-  orders: {
-    create: (orderData: any) =>
-      request<ApiResponse<any>>('/api/orders', {
-        method: 'POST',
-        body: JSON.stringify(orderData),
-      }),
-    getById: (id: string) => request<ApiResponse<any>>(`/api/orders/${id}`),
-    getByNumber: (orderNumber: string) =>
-      request<ApiResponse<any>>(`/api/orders/number/${encodeURIComponent(orderNumber)}`),
-    getAdminOrders: (params: Record<string, any> = {}) => {
-      const searchParams = new URLSearchParams();
-      Object.entries(params).forEach(([key, val]) => {
-        if (val !== undefined && val !== null && val !== '') {
-          searchParams.append(key, String(val));
-        }
-      });
-      const query = searchParams.toString();
-      return request<ApiResponse<any[]>>(`/api/orders/admin/all${query ? `?${query}` : ''}`);
-    },
-    getAdminStats: () => request<ApiResponse<any>>('/api/orders/admin/stats'),
-    previewArchive: (fromDate: string, toDate: string) => {
-      const searchParams = new URLSearchParams({ fromDate, toDate });
-      return request<ApiResponse<{ count: number; fromDate: string; toDate: string }> & { count: number }>(
-        `/api/orders/admin/archive/preview?${searchParams.toString()}`,
-      );
-    },
-    exportArchive: async (fromDate: string, toDate: string) => {
-      const headers = new Headers({ 'Content-Type': 'application/json' });
-      try {
-        const localToken = localStorage.getItem('gsm_token');
-        if (localToken) headers.set('Authorization', `Bearer ${localToken}`);
-      } catch {
-        // The HttpOnly cookie remains available when localStorage is restricted.
+    getAll: async (params: Record<string, any> = {}): Promise<ApiResponse<any[]>> => {
+      let products = await getCollection('products');
+      const isAdmin = params.admin === 'true';
+      if (!isAdmin) products = products.filter((product) => product.isActive !== false);
+      if (params.category) products = products.filter((product) => product.category === params.category);
+      if (params.inStock === 'true') products = products.filter((product) => Number(product.stock) > 0);
+      if (params.minPrice !== undefined) {
+        products = products.filter((product) => Number(product.priceTND ?? product.price) >= Number(params.minPrice));
+      }
+      if (params.maxPrice !== undefined) {
+        products = products.filter((product) => Number(product.priceTND ?? product.price) <= Number(params.maxPrice));
+      }
+      if (params.status === 'active') products = products.filter((product) => product.isActive !== false);
+      if (params.status === 'inactive') products = products.filter((product) => product.isActive === false);
+      if (params.search) {
+        const search = String(params.search).trim().toLocaleLowerCase();
+        products = products.filter((product) =>
+          `${JSON.stringify(product.name)} ${product.sku ?? ''} ${product.brand ?? ''}`
+            .toLocaleLowerCase()
+            .includes(search),
+        );
       }
 
-      const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
-      const response = await fetch(`${baseUrl}/api/orders/admin/archive/export`, {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify({ fromDate, toDate }),
+      const sortBy = params.sortBy;
+      products.sort((a, b) => {
+        if (sortBy === 'price-asc') return Number(a.priceTND ?? a.price) - Number(b.priceTND ?? b.price);
+        if (sortBy === 'price-desc') return Number(b.priceTND ?? b.price) - Number(a.priceTND ?? a.price);
+        if (sortBy === 'rating') return Number(b.rating ?? 0) - Number(a.rating ?? 0);
+        if (sortBy === 'oldest') return String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? ''));
+        if (sortBy === 'name') return String(a.name ?? '').localeCompare(String(b.name ?? ''));
+        return String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? ''));
       });
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        throw new Error(error?.message || `Erreur serveur (${response.status})`);
-      }
+
+      const page = Math.max(1, Number(params.page) || 1);
+      const pageSize = Math.max(1, Number(params.limit) || products.length || 1);
+      const total = products.length;
+      const data = products.slice((page - 1) * pageSize, page * pageSize);
       return {
-        data: await response.json(),
-        token: response.headers.get('X-Order-Archive-Token'),
+        success: true,
+        data,
+        pagination: {
+          total,
+          page,
+          limit: pageSize,
+          totalPages: Math.max(1, Math.ceil(total / pageSize)),
+          hasMore: page * pageSize < total,
+        },
       };
     },
-    archiveExported: (token: string, confirmedCount: number) =>
-      request<ApiResponse<{ archivedCount: number }>>('/api/orders/admin/archive/apply', {
-        method: 'POST',
-        body: JSON.stringify({ token, confirmedCount }),
-      }),
-    getArchived: (params: Record<string, any> = {}) => {
-      const searchParams = new URLSearchParams();
-      Object.entries(params).forEach(([key, val]) => {
-        if (val !== undefined && val !== null && val !== '') {
-          searchParams.append(key, String(val));
-        }
-      });
-      const query = searchParams.toString();
-      return request<ApiResponse<any[]>>(
-        `/api/orders/admin/archive/archived${query ? `?${query}` : ''}`,
-      );
+    getById: async (id: string) => {
+      const snapshot = await getDoc(doc(db, 'products', id));
+      return { success: true, data: snapshot.exists() ? await getProductWithReviews(id, snapshot.data()) : null };
     },
-    restoreArchived: (id: string) =>
-      request<ApiResponse<any>>(`/api/orders/admin/archive/${encodeURIComponent(id)}/restore`, {
-        method: 'PATCH',
-      }),
-    updateStatus: (id: string, status: string, paymentStatus?: string) =>
-      request<ApiResponse<any>>(`/api/orders/${id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status, paymentStatus }),
-      }),
-    update: (id: string, data: {
-      customerName: string;
-      customerPhone: string;
-      customerEmail?: string | null;
-      governorate: string;
-      delegation?: string | null;
-      address: string;
-      notes?: string | null;
-      paymentMethod?: 'cod' | 'bank_transfer' | 'online';
-    }) =>
-      request<ApiResponse<any>>(`/api/orders/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      }),
-    delete: (id: string) =>
-      request<ApiResponse<any>>(`/api/orders/${id}`, {
-        method: 'DELETE',
-      }),
+    getBySlug: async (slug: string) => {
+      const snapshot = await getDocs(query(collection(db, 'products'), where('slug', '==', slug), limit(1)));
+      const product = snapshot.docs[0];
+      return {
+        success: true,
+        data: product ? await getProductWithReviews(product.id, product.data()) : null,
+      };
+    },
+    create: async (productData: DocumentData): Promise<ApiResponse<any>> => {
+      const now = new Date().toISOString();
+      const reference = await addDoc(collection(db, 'products'), {
+        ...productData,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { success: true, data: { id: reference.id, ...productData, createdAt: now, updatedAt: now } };
+    },
+    update: async (id: string, productData: DocumentData): Promise<ApiResponse<any>> => {
+      const updatedAt = new Date().toISOString();
+      await updateDoc(doc(db, 'products', id), { ...productData, updatedAt });
+      return { success: true, data: { id, ...productData, updatedAt } };
+    },
+    delete: async (id: string) => {
+      const orders = await getOrders();
+      const hasOrders = orders.some((order) =>
+        Array.isArray(order.items) && order.items.some((item: DocumentData) => item.productId === id),
+      );
+      if (hasOrders) {
+        await updateDoc(doc(db, 'products', id), { isActive: false, updatedAt: new Date().toISOString() });
+        return {
+          success: true,
+          softDeleted: true,
+          message: 'Le produit est lié à des commandes et a été masqué pour préserver leur historique.',
+        };
+      }
+      await deleteDoc(doc(db, 'products', id));
+      return { success: true, deleted: true, message: 'Produit supprimé.' };
+    },
+    patchStatus: async (id: string, isActive: boolean) => {
+      await updateDoc(doc(db, 'products', id), { isActive, updatedAt: new Date().toISOString() });
+      return { success: true, message: isActive ? 'Produit activé.' : 'Produit masqué.' };
+    },
   },
 
-  // Authentication
-  auth: {
-    register: async (userData: any) => {
-      const res = await request<ApiResponse<any>>('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(userData),
-      });
-      if (res?.token) {
-        try {
-          localStorage.setItem('gsm_token', res.token);
-        } catch {}
+  settings: {
+    get: async () => {
+      const snapshot = await getDoc(doc(db, 'settings', 'store'));
+      return { success: true, data: snapshot.exists() ? documentData(snapshot.id, snapshot.data()) : null };
+    },
+    update: async (data: DocumentData): Promise<ApiResponse<any>> => {
+      const updatedAt = new Date().toISOString();
+      await setDoc(doc(db, 'settings', 'store'), { ...data, updatedAt }, { merge: true });
+      return { success: true, data: { ...data, id: 'store', updatedAt } };
+    },
+    uploadLogo: async (file: File) => {
+      const result = await uploadImage(file);
+      return { success: true, data: { logoUrl: result.url }, ...result };
+    },
+    uploadFavicon: async (file: File) => {
+      const result = await uploadImage(file);
+      return { success: true, data: { faviconUrl: result.url }, ...result };
+    },
+  },
+
+  categories: {
+    getAll: async () => {
+      const categories = await getCollection('categories');
+      categories.sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+      return { success: true, data: categories };
+    },
+    create: async (data: DocumentData) => {
+      const reference = await addDoc(collection(db, 'categories'), data);
+      return { success: true, data: { id: reference.id, ...data } };
+    },
+    update: async (id: string, data: DocumentData) => {
+      await updateDoc(doc(db, 'categories', id), data);
+      return { success: true, data: { id, ...data } };
+    },
+    delete: async (id: string) => {
+      const categorySnapshot = await getDoc(doc(db, 'categories', id));
+      if (!categorySnapshot.exists()) throw new Error('Catégorie introuvable.');
+      const category = categorySnapshot.data();
+      const products = await getCollection('products');
+      if (products.some((product) => product.category === category.slug)) {
+        throw new Error('Cette catégorie contient encore des produits.');
       }
-      return res;
+      await deleteDoc(doc(db, 'categories', id));
+      return { success: true };
     },
-    login: async (credentials: any) => {
-      const res = await request<ApiResponse<any>>('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(credentials),
+  },
+
+  orders: {
+    create: async (orderData: DocumentData): Promise<ApiResponse<any>> => {
+      const result = await createOrderCallable({
+        ...orderData,
+        userId: auth.currentUser?.uid ?? null,
       });
-      if (res?.token) {
-        try {
-          localStorage.setItem('gsm_token', res.token);
-        } catch {}
-      }
-      return res;
+      return result.data;
     },
-    firebase: async (idToken: string) => {
-      const res = await request<ApiResponse<any>>('/api/auth/firebase', {
-        method: 'POST',
-        body: JSON.stringify({ idToken }),
-      });
-      if (res?.token) {
-        try {
-          localStorage.setItem('gsm_token', res.token);
-        } catch {}
-      }
-      return res;
+    getById: async (id: string) => {
+      const snapshot = await getDoc(doc(db, 'orders', id));
+      return { success: true, data: snapshot.exists() ? documentData(snapshot.id, snapshot.data()) : null };
     },
-    logout: async () => {
-      try {
-        localStorage.removeItem('gsm_token');
-      } catch {}
-      return request<ApiResponse<any>>('/api/auth/logout', {
-        method: 'POST',
-      });
+    getByNumber: async (orderNumber: string) => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return { success: true, data: null };
+      const userSnapshot = await getDoc(doc(db, 'users', currentUser.uid));
+      const isStaff = ['ADMIN', 'TECHNICIEN'].includes(userSnapshot.data()?.role);
+      const orderQuery = isStaff
+        ? query(collection(db, 'orders'), where('orderNumber', '==', orderNumber), limit(1))
+        : query(collection(db, 'orders'), where('userId', '==', currentUser.uid));
+      const snapshot = await getDocs(orderQuery);
+      const order = snapshot.docs.find((item) => item.data().orderNumber === orderNumber);
+      return {
+        success: true,
+        data: order ? documentData(order.id, order.data()) : null,
+      };
     },
-    getMe: () => request<ApiResponse<any>>('/api/auth/me'),
+    getAdminOrders: async (params: Record<string, any> = {}) => {
+      const orders = (await getOrders())
+        .filter((order) => !order.archivedAt)
+        .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
+      const page = Math.max(1, Number(params.page) || 1);
+      const pageSize = Math.max(1, Number(params.limit) || 100);
+      return {
+        success: true,
+        data: orders.slice((page - 1) * pageSize, page * pageSize),
+        pagination: {
+          total: orders.length,
+          page,
+          limit: pageSize,
+          totalPages: Math.max(1, Math.ceil(orders.length / pageSize)),
+        },
+      };
+    },
+    getAdminStats: async () => {
+      const [orders, products, categories] = await Promise.all([
+        getOrders(),
+        getCollection('products'),
+        getCollection('categories'),
+      ]);
+      const completedOrders = orders.filter((order) => order.status !== 'CANCELLED');
+      return {
+        success: true,
+        data: {
+          totalOrders: orders.length,
+          totalRevenue: completedOrders.reduce((sum, order) => sum + Number(order.totalTND ?? 0), 0),
+          totalProducts: products.filter((product) => product.isActive !== false).length,
+          catalogProducts: products.length,
+          totalCategories: categories.length,
+          deliveredOrders: orders.filter((order) => order.status === 'DELIVERED').length,
+          lowStockProducts: products.filter((product) => Number(product.stock) > 0 && Number(product.stock) <= Number(product.lowStockThreshold ?? 5)).length,
+          recentOrders: orders.sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? ''))).slice(0, 5),
+        },
+      };
+    },
+    previewArchive: async (fromDate: string, toDate: string) => {
+      const selected = (await getOrders()).filter((order) =>
+        !order.archivedAt && dateIsInRange(order.createdAt, fromDate, toDate),
+      );
+      return { success: true, count: selected.length, data: { count: selected.length, fromDate, toDate } };
+    },
+    exportArchive: async (fromDate: string, toDate: string) => {
+      const selected = (await getOrders()).filter((order) =>
+        !order.archivedAt && dateIsInRange(order.createdAt, fromDate, toDate),
+      );
+      const token = crypto.randomUUID();
+      archiveSelections.set(token, selected.map((order) => order.id));
+      return {
+        data: { fromDate, toDate, count: selected.length, data: selected },
+        token,
+      };
+    },
+    archiveExported: async (token: string, confirmedCount: number) => {
+      const ids = archiveSelections.get(token);
+      if (!ids || ids.length !== confirmedCount) throw new Error('La sélection d’export a expiré ou changé.');
+      if (ids.length > 450) throw new Error('Exportez moins de 450 commandes à la fois pour éviter un archivage partiel.');
+      const batch = writeBatch(db);
+      const archivedAt = new Date().toISOString();
+      ids.forEach((id) => batch.update(doc(db, 'orders', id), { archivedAt, updatedAt: archivedAt }));
+      await batch.commit();
+      archiveSelections.delete(token);
+      return { success: true, message: `${ids.length} commande(s) archivée(s).` };
+    },
+    getArchived: async (params: Record<string, any> = {}) => {
+      const archived = (await getOrders())
+        .filter((order) => Boolean(order.archivedAt))
+        .sort((a, b) => String(b.archivedAt).localeCompare(String(a.archivedAt)));
+      const page = Math.max(1, Number(params.page) || 1);
+      const pageSize = Math.max(1, Number(params.limit) || 100);
+      return {
+        success: true,
+        data: archived.slice((page - 1) * pageSize, page * pageSize),
+        pagination: { total: archived.length, page, limit: pageSize, totalPages: Math.max(1, Math.ceil(archived.length / pageSize)) },
+      };
+    },
+    restoreArchived: async (id: string) => {
+      await updateDoc(doc(db, 'orders', id), { archivedAt: deleteField(), updatedAt: new Date().toISOString() });
+      return { success: true };
+    },
+    updateStatus: async (id: string, status: string, paymentStatus?: string) => {
+      const data: DocumentData = { status, orderStatus: status, updatedAt: new Date().toISOString() };
+      if (paymentStatus) data.paymentStatus = paymentStatus;
+      await updateDoc(doc(db, 'orders', id), data);
+      return { success: true, data: { id, ...data } };
+    },
+    update: async (id: string, data: DocumentData): Promise<ApiResponse<any>> => {
+      const updatedAt = new Date().toISOString();
+      await updateDoc(doc(db, 'orders', id), { ...data, updatedAt });
+      return { success: true, data: { id, ...data, updatedAt } };
+    },
+    delete: async (id: string) => {
+      const deletedAt = new Date().toISOString();
+      await updateDoc(doc(db, 'orders', id), { deletedAt, updatedAt: deletedAt });
+      return { success: true, message: 'Commande masquée; son historique est conservé.' };
+    },
   },
 
   adminUsers: {
-    getAll: (params: { page?: number; limit?: number; search?: string } = {}) => {
-      const searchParams = new URLSearchParams();
-      Object.entries(params).forEach(([key, val]) => {
-        if (val !== undefined && val !== '') searchParams.set(key, String(val));
+    getAll: async (params: { page?: number; limit?: number; search?: string } = {}) => {
+      let users = await getCollection('users');
+      const orders = await getOrders();
+      const orderCounts = new Map<string, number>();
+      orders.forEach((order) => {
+        if (typeof order.userId === 'string') orderCounts.set(order.userId, (orderCounts.get(order.userId) ?? 0) + 1);
       });
-      const query = searchParams.toString();
-      return request<ApiResponse<any[]>>(
-        `/api/admin/users${query ? `?${query}` : ''}`,
-      );
+      users = users.map((user) => ({ ...user, _count: { orders: orderCounts.get(user.id) ?? 0 } }));
+      if (params.search) {
+        const search = params.search.toLocaleLowerCase();
+        users = users.filter((user) => `${user.name ?? ''} ${user.email ?? ''} ${user.phone ?? ''}`.toLocaleLowerCase().includes(search));
+      }
+      users.sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
+      const page = Math.max(1, Number(params.page) || 1);
+      const pageSize = Math.max(1, Number(params.limit) || 25);
+      return {
+        success: true,
+        data: users.slice((page - 1) * pageSize, page * pageSize),
+        pagination: { total: users.length, page, limit: pageSize, totalPages: Math.max(1, Math.ceil(users.length / pageSize)) },
+      };
     },
-    updateRole: (id: string, role: 'ADMIN' | 'CUSTOMER') =>
-      request<ApiResponse<any>>(`/api/admin/users/${encodeURIComponent(id)}/role`, {
-        method: 'PATCH',
-        body: JSON.stringify({ role }),
-      }),
+    updateRole: async (
+      id: string,
+      role: 'ADMIN' | 'CUSTOMER' | 'TECHNICIEN',
+    ): Promise<ApiResponse<any>> => {
+      await updateDoc(doc(db, 'users', id), { role, updatedAt: new Date().toISOString() });
+      return { success: true, data: { id, role } };
+    },
   },
 
-  // Reviews
   reviews: {
-    create: (data: { productId: string; name: string; rating: number; comment: string }) =>
-      request<ApiResponse<any>>('/api/reviews', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-  },
-
-  // Upload
-  upload: {
-    image: (file: File) => {
-      const formData = new FormData();
-      formData.append('image', file);
-      return request<{ success: boolean; url: string; filename: string }>('/api/upload', {
-        method: 'POST',
-        body: formData,
+    create: async (data: { productId: string; name: string; rating: number; comment: string }) => {
+      const createdAt = new Date().toISOString();
+      const reference = await addDoc(collection(db, 'reviews'), {
+        ...data,
+        rating: Math.min(5, Math.max(1, Math.floor(data.rating))),
+        createdAt,
       });
+      return { success: true, data: { id: reference.id, ...data, createdAt } };
     },
   },
 
-  // Health
-  health: {
-    check: () => request<{ status: string; database: string; environment: string }>('/api/health'),
+  upload: {
+    image: async (file: File) => ({ success: true, ...(await uploadImage(file)) }),
   },
 };

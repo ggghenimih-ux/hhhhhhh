@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Bell, BellRing, MessageCircle, Volume2, VolumeX, X } from 'lucide-react';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../services/firebase';
 import { orderConfirmationMessage, whatsappLink } from '../lib/whatsapp';
 
 type NewOrderEvent = {
@@ -41,6 +44,7 @@ function playChime(ctx: AudioContext) {
 }
 
 export default function AdminOrderNotifier({ onOpenOrder, onPendingChange }: Props) {
+  const { user } = useAuth();
   const [pending, setPending] = useState(0);
   const [latest, setLatest] = useState<PendingOrder[]>([]);
   const [toasts, setToasts] = useState<NewOrderEvent[]>([]);
@@ -64,18 +68,6 @@ export default function AdminOrderNotifier({ onOpenOrder, onPendingChange }: Pro
     }
   }, []);
 
-  const refresh = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/notifications/summary', { credentials: 'include' });
-      if (!res.ok) return;
-      const json = await res.json();
-      setPending(json.data.pending);
-      setLatest(json.data.latest);
-    } catch {
-      /* réseau indisponible : on réessaiera */
-    }
-  }, []);
-
   const dismissToast = (id: string) => setToasts((prev) => prev.filter((t) => t.id !== id));
 
   useEffect(() => {
@@ -83,52 +75,69 @@ export default function AdminOrderNotifier({ onOpenOrder, onPendingChange }: Pro
   }, [pending, onPendingChange]);
 
   useEffect(() => {
-    refresh();
+    if (!user || !['ADMIN', 'TECHNICIEN'].includes(user.role || '')) {
+      setPending(0);
+      setLatest([]);
+      return;
+    }
 
-    const source = new EventSource('/api/admin/notifications/stream', { withCredentials: true });
+    let isInitialSnapshot = true;
+    const pendingOrdersQuery = query(collection(db, 'orders'), where('status', '==', 'PENDING'));
+    const unsubscribe = onSnapshot(
+      pendingOrdersQuery,
+      (snapshot) => {
+        const orders = snapshot.docs
+          .map((orderDoc): Record<string, any> & { id: string } => {
+            const data: Record<string, any> = orderDoc.data();
+            return { ...data, id: orderDoc.id };
+          })
+          .filter((order) => !order.deletedAt && !order.archivedAt)
+          .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
+        setPending(orders.length);
+        setLatest(orders.slice(0, 5).map((order) => ({
+          id: order.id,
+          orderNumber: order.orderNumber ?? '',
+          customerName: order.customerName ?? '',
+          customerPhone: order.customerPhone ?? '',
+          totalTND: Number(order.totalTND ?? 0),
+          createdAt: order.createdAt ?? '',
+        })));
 
-    source.addEventListener('ready', refresh); // rattrape les commandes arrivées pendant une coupure
-    source.addEventListener('new-order', (e) => {
-      const order: NewOrderEvent = JSON.parse((e as MessageEvent).data);
-      setToasts((prev) => [order, ...prev].slice(0, 4));
-      window.setTimeout(() => dismissToast(order.id), 15000);
-      refresh();
-
-      if (soundOnRef.current && audioRef.current) playChime(audioRef.current);
-      if ('vibrate' in navigator) navigator.vibrate?.([200, 100, 200]);
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
-        new Notification(`Nouvelle commande ${order.orderNumber}`, {
-          body: `${order.customerName} — ${order.totalTND.toFixed(3)} DT`,
-        });
-      }
-    });
-    source.addEventListener('order-updated', refresh);
-    source.addEventListener('order-deleted', refresh);
-    source.addEventListener('test', () => {
-      const testNotification: NewOrderEvent = {
-        id: `test-${Date.now()}`,
-        orderNumber: 'TEST',
-        customerName: 'Test de notification',
-        customerPhone: '',
-        governorate: '—',
-        totalTND: 0,
-        itemsCount: 0,
-        createdAt: new Date().toISOString(),
-        isTest: true,
-      };
-      setToasts((prev) => [testNotification, ...prev].slice(0, 4));
-      window.setTimeout(() => dismissToast(testNotification.id), 15000);
-      if (soundOnRef.current && audioRef.current) playChime(audioRef.current);
-      if ('vibrate' in navigator) navigator.vibrate?.([200, 100, 200]);
-      refresh();
-    });
-
-    const poll = window.setInterval(refresh, 60000); // filet de sécurité si le flux est coupé
-    return () => {
-      source.close();
-      window.clearInterval(poll);
-    };
-  }, [refresh]);
+        if (!isInitialSnapshot) {
+          snapshot.docChanges()
+            .filter((change) => change.type === 'added')
+            .forEach((change) => {
+              const order = change.doc.data();
+              if (order.deletedAt || order.archivedAt) return;
+              const notification: NewOrderEvent = {
+                id: change.doc.id,
+                orderNumber: order.orderNumber ?? '',
+                customerName: order.customerName ?? '',
+                customerPhone: order.customerPhone ?? '',
+                governorate: order.governorate ?? '',
+                totalTND: Number(order.totalTND ?? 0),
+                itemsCount: Array.isArray(order.items) ? order.items.length : 0,
+                createdAt: order.createdAt ?? '',
+              };
+              setToasts((current) => [notification, ...current].slice(0, 4));
+              window.setTimeout(() => dismissToast(notification.id), 15000);
+              if (soundOnRef.current && audioRef.current) playChime(audioRef.current);
+              if ('vibrate' in navigator) navigator.vibrate?.([200, 100, 200]);
+              if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
+                new Notification(`Nouvelle commande ${notification.orderNumber}`, {
+                  body: `${notification.customerName} — ${notification.totalTND.toFixed(3)} DT`,
+                });
+              }
+            });
+        }
+        isInitialSnapshot = false;
+      },
+      (error) => {
+        console.error('Impossible de recevoir les commandes Firestore en temps réel:', error);
+      },
+    );
+    return unsubscribe;
+  }, [user?.id, user?.role]);
 
   // Compteur dans l'onglet du navigateur : "(3) Admin"
   useEffect(() => {

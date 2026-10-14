@@ -88,7 +88,7 @@ export const CheckoutPage: React.FC = () => {
       } catch {}
 
       showToast(t.orderConfirmed, 'success');
-      navigateTo('order-success', { orderNumber: order.orderNumber });
+      navigateTo('order-success', { orderNumber: order.id });
     } catch (err: any) {
       const msg = err.message || 'Erreur lors de la création de la commande.';
       setErrorMessage(msg);

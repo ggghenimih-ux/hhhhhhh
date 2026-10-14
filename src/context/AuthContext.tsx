@@ -4,23 +4,38 @@ import {
   signInWithEmailAndPassword, 
   signInWithPopup,
   GoogleAuthProvider,
-  signOut as firebaseSignOut 
+  signOut as firebaseSignOut,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  updateProfile,
+  User as FirebaseUser,
 } from 'firebase/auth';
-import { collection, query, where, getDocs, setDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 
 interface UserType {
   id: string;
-  email: string | null;
+  email: string;
   name?: string;
-  role?: string;
+  firstName?: string;
+  phone: string;
+  role?: 'ADMIN' | 'TECHNICIEN' | 'CUSTOMER';
 }
 
 interface AuthContextType {
   user: UserType | null;
   loading: boolean;
+  isAuthenticated: boolean;
+  isAdmin: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; user?: UserType; error?: string }>;
   loginWithGoogle: () => Promise<{ success: boolean; user?: UserType; error?: string }>;
+  register: (email: string, password: string, name: string) => Promise<{
+    success: boolean;
+    user?: UserType;
+    requiresEmailVerification?: boolean;
+    message?: string;
+    error?: string;
+  }>;
   logout: () => Promise<void>;
 }
 
@@ -30,30 +45,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserData = async (firebaseUser: any) => {
+  const fetchUserData = async (firebaseUser: FirebaseUser) => {
     let userData: UserType = {
       id: firebaseUser.uid,
-      email: firebaseUser.email,
+      email: firebaseUser.email || '',
       name: firebaseUser.displayName || 'User',
-      role: 'client'
+      phone: '',
+      role: 'CUSTOMER'
     };
 
     try {
-      // البحث عن المستخدم في مجموعة users باستخدام البريد الإلكتروني لضمان المطابقة
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('email', '==', firebaseUser.email));
-      const querySnapshot = await getDocs(q);
+      const userRef = doc(db, 'users', firebaseUser.uid);
+      const userSnapshot = await getDoc(userRef);
 
-      if (!querySnapshot.empty) {
-        const userDoc = querySnapshot.docs[0];
-        userData = { ...userData, id: userDoc.id, ...userDoc.data() };
+      if (userSnapshot.exists()) {
+        const profile = userSnapshot.data();
+        const role = ['ADMIN', 'TECHNICIEN', 'CUSTOMER'].includes(profile.role)
+          ? profile.role
+          : 'CUSTOMER';
+        userData = {
+          ...userData,
+          name: profile.name || userData.name,
+          firstName: profile.firstName,
+          phone: profile.phone || '',
+          role,
+        };
       } else {
-        // إذا لم يكن موجوداً، نقوم بإنشائه تلقائياً بدور client
-        const newUserRef = doc(db, 'users', firebaseUser.uid);
-        await setDoc(newUserRef, {
+        await setDoc(userRef, {
           email: firebaseUser.email,
           name: firebaseUser.displayName || 'User',
-          role: 'client',
+          role: 'CUSTOMER',
           createdAt: serverTimestamp()
         });
       }
@@ -101,13 +122,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const register = async (email: string, password: string, name: string) => {
+    try {
+      const credential = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+      await updateProfile(credential.user, { displayName: name.trim() });
+      const userRef = doc(db, 'users', credential.user.uid);
+      await setDoc(userRef, {
+        email: credential.user.email,
+        name: name.trim(),
+        role: 'CUSTOMER',
+        createdAt: serverTimestamp(),
+      });
+      await sendEmailVerification(credential.user);
+      await firebaseSignOut(auth);
+      return {
+        success: true,
+        requiresEmailVerification: true,
+        message: 'Vérifiez votre adresse e-mail avant de vous connecter.',
+      };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Erreur lors de la création du compte.' };
+    }
+  };
+
   const logout = async () => {
     await firebaseSignOut(auth);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        isAuthenticated: user !== null,
+        isAdmin: user?.role === 'ADMIN',
+        login,
+        loginWithGoogle,
+        register,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

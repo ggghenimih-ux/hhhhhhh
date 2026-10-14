@@ -22,6 +22,27 @@ export const TrackOrderPage: React.FC = () => {
   const [searched, setSearched] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  const loadByTrackingToken = async (token: string) => {
+    try {
+      setIsLoading(true);
+      setErrorMsg('');
+      setSearched(true);
+      const result = await api.orders.getById(token);
+      if (result?.data) {
+        setOrder(result.data);
+        setSearchNumber(result.data.orderNumber);
+      } else {
+        setOrder(null);
+        setErrorMsg('Aucune commande trouvée avec ce lien de suivi.');
+      }
+    } catch (error) {
+      setOrder(null);
+      setErrorMsg(error instanceof Error ? error.message : 'Impossible de charger cette commande.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const performSearch = async (num: string) => {
     if (!num.trim()) return;
     try {
@@ -45,8 +66,7 @@ export const TrackOrderPage: React.FC = () => {
 
   useEffect(() => {
     if (routeParams.orderNumber) {
-      setSearchNumber(routeParams.orderNumber);
-      performSearch(routeParams.orderNumber);
+      void loadByTrackingToken(routeParams.orderNumber);
     }
   }, [routeParams.orderNumber]);
 

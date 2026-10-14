@@ -16,16 +16,21 @@ export const OrderSuccessPage: React.FC = () => {
   const { t, formatPrice, lastPlacedOrder, routeParams, navigateTo, settings } = useStore();
   const [order, setOrder] = useState<Order | null>(lastPlacedOrder);
   const [isLoading, setIsLoading] = useState(!lastPlacedOrder);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (!lastPlacedOrder && routeParams.orderNumber) {
       setIsLoading(true);
+      setLoadError('');
       api.orders
-        .getByNumber(routeParams.orderNumber)
+        .getById(routeParams.orderNumber)
         .then((res) => {
           if (res?.data) setOrder(res.data);
         })
-        .catch(() => {})
+        .catch((error) => {
+          console.error('Impossible de charger la commande depuis Firestore:', error);
+          setLoadError('Impossible de charger les détails de cette commande.');
+        })
         .finally(() => setIsLoading(false));
     }
   }, [lastPlacedOrder, routeParams.orderNumber]);
@@ -41,7 +46,9 @@ export const OrderSuccessPage: React.FC = () => {
   if (!order) {
     return (
       <div className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
-        <h2 className="text-lg font-bold text-slate-900">Aucune commande récente trouvée.</h2>
+        <h2 className="text-lg font-bold text-slate-900">
+          {loadError || 'Aucune commande récente trouvée.'}
+        </h2>
         <button
           onClick={() => navigateTo('home')}
           className="px-5 py-2.5 rounded-xl bg-orange-600 text-white font-bold text-xs"
@@ -173,7 +180,7 @@ export const OrderSuccessPage: React.FC = () => {
           </button>
 
           <button
-            onClick={() => navigateTo('track-order', { orderNumber: order.orderNumber })}
+            onClick={() => navigateTo('track-order', { orderNumber: order.id })}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-md"
           >
             <Package className="w-4 h-4" />

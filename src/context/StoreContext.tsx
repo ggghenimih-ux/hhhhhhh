@@ -105,7 +105,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.fr;
 
-  // 2. Dynamic Store Settings (Loaded from backend SQLite via GET /api/settings)
+  // 2. Dynamic store settings loaded from Firestore.
   const [settings, setSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
@@ -272,6 +272,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [productsError, setProductsError] = useState<string | null>(null);
   const productRequestId = useRef(0);
+  const pendingOrderRequest = useRef<{ signature: string; id: string } | null>(null);
 
   const setFilters: React.Dispatch<React.SetStateAction<FilterState>> = (action) => {
     setFiltersState((prev) => (typeof action === 'function' ? action(prev) : action));
@@ -647,7 +648,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return true;
   });
 
-  // Order Creation (persists to backend API and local store)
+  // Order creation persists to Firestore and the local store.
   const createOrder = async (orderData: any): Promise<Order> => {
     const payload = {
       customerName: orderData.customerName,
@@ -662,19 +663,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       items: cart.map((i) => ({
         productId: i.product.id,
         quantity: i.quantity,
-        priceTND: getProductPrice(i.product),
       })),
     };
 
-    const res = await api.orders.create(payload);
+    const signature = JSON.stringify(payload);
+    if (!pendingOrderRequest.current || pendingOrderRequest.current.signature !== signature) {
+      pendingOrderRequest.current = { signature, id: crypto.randomUUID() };
+    }
+    const res = await api.orders.create({
+      ...payload,
+      requestId: pendingOrderRequest.current.id,
+    });
     if (!res?.data) {
       throw new Error(res?.message || 'Le serveur n’a pas retourné la commande.');
     }
     const newOrder = res.data as Order;
+    pendingOrderRequest.current = null;
 
     setOrders((prev) => [newOrder, ...prev]);
     setLastPlacedOrder(newOrder);
     clearCart();
+    void fetchProducts(productPage, filters);
 
     return newOrder;
   };

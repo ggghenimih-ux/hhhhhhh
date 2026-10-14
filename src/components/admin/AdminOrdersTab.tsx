@@ -141,7 +141,7 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
       if (!response?.success) throw new Error(response?.message || 'La suppression de la commande a échoué.');
       setOrders((current) => current.filter((item) => item.id !== order.id));
       setOrderToDelete(null);
-      showToast('Commande supprimée définitivement.', 'success');
+      showToast('Commande masquée; son historique est conservé.', 'success');
       onRefreshData?.();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Impossible de supprimer cette commande.', 'error');

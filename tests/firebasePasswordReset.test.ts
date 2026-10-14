@@ -10,6 +10,10 @@ vi.mock('firebase/app', () => ({
   initializeApp: firebaseMocks.initializeApp,
 }));
 
+vi.mock('firebase/firestore', () => ({
+  getFirestore: vi.fn(() => ({})),
+}));
+
 vi.mock('firebase/auth', () => ({
   getAuth: firebaseMocks.getAuth,
   sendPasswordResetEmail: firebaseMocks.sendPasswordResetEmail,
