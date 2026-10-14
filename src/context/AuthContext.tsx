@@ -2,9 +2,11 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut as firebaseSignOut 
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 
 interface UserType {
@@ -17,7 +19,8 @@ interface UserType {
 interface AuthContextType {
   user: UserType | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ success: boolean; user?: UserType; error?: string }>;
+  loginWithGoogle: () => Promise<{ success: boolean; user?: UserType; error?: string }>;
   logout: () => Promise<void>;
 }
 
@@ -37,7 +40,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: 'client'
         };
 
-        // Fetch additional user details from Firestore if available
         try {
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           const userDoc = await getDoc(userDocRef);
@@ -59,7 +61,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+      
+      let userData: UserType = {
+        id: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: firebaseUser.displayName || 'User',
+        role: 'client'
+      };
+
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        userData = { ...userData, ...userDoc.data() };
+      }
+
+      setUser(userData);
+      return { success: true, user: userData };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Échec de connexion' };
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+
+      let userData: UserType = {
+        id: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: firebaseUser.displayName || 'User',
+        role: 'client'
+      };
+
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists()) {
+        userData = { ...userData, ...userDoc.data() };
+      } else {
+        // إنشاء سجل للمستخدم الجديد في Firestore إذا لم يكن موجوداً
+        await setDoc(userDocRef, {
+          email: firebaseUser.email,
+          name: firebaseUser.displayName || 'User',
+          role: 'client',
+          createdAt: serverTimestamp()
+        });
+      }
+
+      setUser(userData);
+      return { success: true, user: userData };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Échec de la connexion avec Google.' };
+    }
   };
 
   const logout = async () => {
@@ -68,7 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );
