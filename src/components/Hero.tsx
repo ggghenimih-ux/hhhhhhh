@@ -104,9 +104,8 @@ export const Hero: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-1 flex items-center justify-between text-xs text-slate-500">
+              <div className="pt-1 text-xs text-slate-500">
                 <span>{language === 'ar' ? 'الدفع نقداً عند الاستلام' : 'Paiement en espèces à la livraison'}</span>
-                <span className="font-semibold text-slate-700">Tunis · Sousse · Sfax</span>
               </div>
             </div>
           </div>

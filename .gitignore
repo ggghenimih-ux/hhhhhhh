@@ -11,6 +11,9 @@ coverage/
 # Local database & user uploads must never be committed
 prisma/*.db
 prisma/*.db-journal
+tools/import/preserved/*.db
+tools/import/preserved/*.db-wal
+tools/import/preserved/*.db-shm
 uploads/
 !public/uploads/
 !public/uploads/products/

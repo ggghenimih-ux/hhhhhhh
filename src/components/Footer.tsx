@@ -128,15 +128,6 @@ export const Footer: React.FC = () => {
                   {language === 'ar' ? 'حسابي / تسجيل الدخول' : 'Mon Compte / Connexion'}
                 </button>
               </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => navigateTo('admin-login')}
-                  className="hover:text-orange-400 text-slate-500 transition text-[11px] flex items-center gap-1 pt-1"
-                >
-                  <span>🔒 {language === 'ar' ? 'فضاء الإدارة (Admin)' : 'Espace Administrateur'}</span>
-                </button>
-              </li>
             </ul>
           </div>
 
