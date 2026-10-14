@@ -9,6 +9,7 @@ coverage/
 .env*
 !.env.example
 !.env.notifications.example
+my-key.json
 
 # Local database & user uploads must never be committed
 prisma/*.db
