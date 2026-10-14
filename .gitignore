@@ -14,6 +14,9 @@ prisma/*.db-journal
 tools/import/preserved/*.db
 tools/import/preserved/*.db-wal
 tools/import/preserved/*.db-shm
+tools/import/backup/*.db
+tools/import/backup/*.db-wal
+tools/import/backup/*.db-shm
 uploads/
 !public/uploads/
 !public/uploads/products/
