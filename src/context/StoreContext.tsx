@@ -270,7 +270,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [productsError, setProductsError] = useState<string | null>(null);
   const productRequestId = useRef(0);
-  const pendingOrderRequest = useRef<{ signature: string; id: string } | null>(null);
 
   const setFilters: React.Dispatch<React.SetStateAction<FilterState>> = (action) => {
     setFiltersState((prev) => (typeof action === 'function' ? action(prev) : action));
@@ -463,7 +462,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // 11. Filters
   // 12. Toast Notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -637,44 +635,55 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return true;
   });
 
-  // Order creation persists to Firestore and the local store.
+  // Direct Client-Side Order Creation to Firestore (Bypassing Cloud Functions & CORS issues)
   const createOrder = async (orderData: any): Promise<Order> => {
-    const payload = {
-      customerName: orderData.customerName,
-      customerPhone: orderData.customerPhone,
-      customerEmail: orderData.customerEmail ?? null,
-      governorate: orderData.governorate,
-      delegation: orderData.delegation ?? null,
-      address: orderData.address,
-      notes: orderData.notes ?? null,
-      couponCode: couponCode || undefined,
-      paymentMethod: orderData.paymentMethod || 'cod',
-      items: cart.map((i) => ({
-        productId: i.product.id,
-        quantity: i.quantity,
-      })),
-    };
+    try {
+      const payload = {
+        customerName: orderData.customerName,
+        customerPhone: orderData.customerPhone,
+        customerEmail: orderData.customerEmail ?? null,
+        governorate: orderData.governorate,
+        delegation: orderData.delegation ?? null,
+        address: orderData.address,
+        notes: orderData.notes ?? null,
+        couponCode: couponCode || null,
+        paymentMethod: orderData.paymentMethod || 'cod',
+        items: cart.map((i) => ({
+          productId: i.product.id,
+          name: getLocalizedName(i.product),
+          price: getProductPrice(i.product) + (i.selectedVariant?.priceAdjustment || 0),
+          quantity: i.quantity,
+          variant: i.selectedVariant ? i.selectedVariant.name : null,
+        })),
+        cartSubtotal,
+        shippingFee,
+        cartTotal,
+        status: 'pending',
+        orderStatus: 'pending',
+        createdAt: new Date().toISOString(),
+      };
 
-    const signature = JSON.stringify(payload);
-    if (!pendingOrderRequest.current || pendingOrderRequest.current.signature !== signature) {
-      pendingOrderRequest.current = { signature, id: crypto.randomUUID() };
+      const { collection, addDoc } = await import('firebase/firestore');
+      const { db } = await import('../config/firebase');
+
+      const ordersRef = collection(db, 'orders');
+      const docRef = await addDoc(ordersRef, payload);
+
+      const newOrder: Order = {
+        id: docRef.id,
+        ...payload,
+      } as any;
+
+      setOrders((prev) => [newOrder, ...prev]);
+      setLastPlacedOrder(newOrder);
+      clearCart();
+      void fetchProducts(productPage, filters);
+
+      return newOrder;
+    } catch (err: any) {
+      console.error('Erreur lors de la création directe de la commande:', err);
+      throw new Error(err.message || 'Erreur lors de la création de la commande.');
     }
-    const res = await api.orders.create({
-      ...payload,
-      requestId: pendingOrderRequest.current.id,
-    });
-    if (!res?.data) {
-      throw new Error(res?.message || 'Le serveur n’a pas retourné la commande.');
-    }
-    const newOrder = res.data as Order;
-    pendingOrderRequest.current = null;
-
-    setOrders((prev) => [newOrder, ...prev]);
-    setLastPlacedOrder(newOrder);
-    clearCart();
-    void fetchProducts(productPage, filters);
-
-    return newOrder;
   };
 
   const storeValue: StoreContextType = {
