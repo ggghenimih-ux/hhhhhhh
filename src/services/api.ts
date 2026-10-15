@@ -13,7 +13,6 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import app, { auth, db } from './firebase';
 
@@ -111,10 +110,7 @@ const getOrders = async () => {
 };
 
 const archiveSelections = new Map<string, string[]>();
-const createOrderCallable = httpsCallable<DocumentData, ApiResponse<any>>(
-  getFunctions(app, 'europe-west1'),
-  'createOrder',
-);
+
 const dateIsInRange = (value: unknown, fromDate: string, toDate: string) => {
   if (typeof value !== 'string') return false;
   const date = value.slice(0, 10);
@@ -412,11 +408,22 @@ export const api = {
 
   orders: {
     create: async (orderData: DocumentData): Promise<ApiResponse<any>> => {
-      const result = await createOrderCallable({
+      // إرسال الطلب مباشرة إلى Firestore بدون الحاجة للـ Cloud Functions
+      const payload = {
         ...orderData,
         userId: auth.currentUser?.uid ?? null,
-      });
-      return result.data;
+        status: 'pending',
+        orderStatus: 'pending',
+        createdAt: new Date().toISOString(),
+      };
+
+      const docRef = await addDoc(collection(db, 'orders'), payload);
+      const newOrder = { id: docRef.id, ...payload };
+
+      return {
+        success: true,
+        data: newOrder,
+      };
     },
     getById: async (id: string) => {
       const snapshot = await getDoc(doc(db, 'orders', id));
