@@ -5,18 +5,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function role() {
-      return signedIn()
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-        : null;
-    }
-
     function isAdmin() {
-      return role() == 'ADMIN';
-    }
-
-    function isStaff() {
-      return role() in ['ADMIN', 'TECHNICIEN'];
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
     }
 
     match /products/{productId} {
@@ -34,44 +26,58 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll([
+          'productId', 'name', 'rating', 'comment', 'createdAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'productId', 'name', 'rating', 'comment', 'createdAt'
+        ])
+        && request.resource.data.productId is string
+        && request.resource.data.productId.size() > 0
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() > 0
+        && request.resource.data.comment.size() <= 3000
+        && request.resource.data.createdAt is string;
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
     match /orders/{orderId} {
-      // Orders are created only by the callable that validates pricing and stock.
-      allow create: if false;
-      allow get: if isStaff()
-        || (signedIn() && resource.data.userId == request.auth.uid && resource.data.deletedAt == null)
-        || (resource.data.trackingToken == orderId && resource.data.deletedAt == null);
-      allow list: if isStaff()
+      allow create: if true;
+      allow get: if isAdmin()
         || (signedIn() && resource.data.userId == request.auth.uid);
-      allow update: if isStaff();
+      allow list: if isAdmin()
+        || (signedIn() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin();
       allow delete: if false;
     }
 
     match /users/{userId} {
-      allow get: if isAdmin() || (signedIn() && request.auth.uid == userId);
+      allow get: if isAdmin()
+        || (signedIn() && request.auth.uid == userId);
       allow list: if isAdmin();
-      allow create: if isAdmin()
-        || (signedIn()
-          && request.auth.uid == userId
-          && request.resource.data.role == 'CUSTOMER');
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly([
+          'email', 'name', 'firstName', 'phone', 'role', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.role == 'CUSTOMER';
       allow update: if isAdmin()
         || (signedIn()
           && request.auth.uid == userId
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
-      allow delete: if isAdmin();
-    }
-
-    match /reviews/{reviewId} {
-      allow read: if true;
-      allow create: if request.resource.data.keys().hasAll(['productId', 'name', 'rating', 'comment', 'createdAt'])
-        && request.resource.data.rating is int
-        && request.resource.data.rating >= 1
-        && request.resource.data.rating <= 5
-        && request.resource.data.name is string
-        && request.resource.data.name.size() <= 120
-        && request.resource.data.comment is string
-        && request.resource.data.comment.size() > 0
-        && request.resource.data.comment.size() <= 3000;
-      allow update, delete: if isAdmin();
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
+          && request.resource.data.keys().hasOnly([
+            'email', 'name', 'firstName', 'phone', 'role', 'createdAt', 'updatedAt'
+          ]));
+      allow delete: if false;
     }
 
     match /{document=**} {

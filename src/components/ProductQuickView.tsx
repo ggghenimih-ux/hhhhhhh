@@ -13,7 +13,6 @@ import {
   Plus
 } from 'lucide-react';
 import { Variant } from '../types';
-import { MAX_ORDER_QUANTITY } from '../utils/stock';
 
 export const ProductQuickView: React.FC = () => {
   const {
@@ -190,10 +189,9 @@ export const ProductQuickView: React.FC = () => {
                   {quantity}
                 </span>
                 <button
-                  onClick={() => setQuantity(q => Math.min(MAX_ORDER_QUANTITY, q + 1))}
+                  onClick={() => setQuantity(q => q + 1)}
                   aria-label={language === 'ar' ? 'زيادة الكمية' : 'Augmenter la quantité'}
                   className="p-1.5 rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition"
-                  disabled={quantity >= MAX_ORDER_QUANTITY}
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>

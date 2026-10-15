@@ -22,7 +22,6 @@ export interface Variant {
   name: string;
   value: string;
   priceAdjustment: number;
-  stock?: number;
 }
 
 export interface Review {
@@ -56,8 +55,6 @@ export interface Product {
   subcategory?: string;
   image?: string;
   images: string[];
-  stock: number;
-  lowStockThreshold?: number;
   warranty?: string;
   rating: number;
   reviewsCount?: number;
@@ -239,7 +236,6 @@ export interface FilterState {
   brand: string | null;
   minPrice: number;
   maxPrice: number;
-  inStockOnly: boolean;
   discountOnly: boolean;
   searchQuery: string;
   sortBy: 'popularity' | 'price-asc' | 'price-desc' | 'rating' | 'newest';

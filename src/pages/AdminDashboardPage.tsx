@@ -9,6 +9,7 @@ import { AdminCategoriesTab } from '../components/admin/AdminCategoriesTab';
 import { AdminOrdersTab } from '../components/admin/AdminOrdersTab';
 import { AdminMediaTab } from '../components/admin/AdminMediaTab';
 import { AdminUsersTab } from '../components/admin/AdminUsersTab';
+import { AdminProductImportTab } from '../components/admin/AdminProductImportTab';
 import AdminOrderNotifier from '../components/AdminOrderNotifier';
 import {
   ShieldCheck,
@@ -22,13 +23,14 @@ import {
   LogOut,
   ExternalLink,
   Users,
+  Upload,
 } from 'lucide-react';
 
 export const AdminDashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
   const { currentRoute, routeParams, navigateTo } = useStore();
 
-  type TabType = 'overview' | 'settings' | 'products' | 'categories' | 'orders' | 'users' | 'media';
+  type TabType = 'overview' | 'settings' | 'products' | 'categories' | 'orders' | 'users' | 'media' | 'import';
 
   // Determine active tab from route
   const getInitialTab = (): TabType => {
@@ -49,7 +51,6 @@ export const AdminDashboardPage: React.FC = () => {
     catalogProducts?: number;
     totalCategories?: number;
     deliveredOrders?: number;
-    lowStockProducts: number;
     recentOrders?: any[];
   }>({
     totalOrders: 0,
@@ -58,7 +59,6 @@ export const AdminDashboardPage: React.FC = () => {
     catalogProducts: 0,
     totalCategories: 0,
     deliveredOrders: 0,
-    lowStockProducts: 0,
     recentOrders: [],
   });
 
@@ -300,6 +300,18 @@ export const AdminDashboardPage: React.FC = () => {
           <ImageIcon className="w-4 h-4" />
           <span>Médiathèque</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('import')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition flex-shrink-0 ${
+            activeTab === 'import'
+              ? 'bg-slate-900 text-white shadow-md'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Upload className="w-4 h-4" />
+          <span>Importer des produits</span>
+        </button>
       </div>
 
       {/* Render Active Tab Component */}
@@ -334,6 +346,10 @@ export const AdminDashboardPage: React.FC = () => {
         {activeTab === 'users' && <AdminUsersTab />}
 
         {activeTab === 'media' && <AdminMediaTab />}
+
+        {activeTab === 'import' && (
+          <AdminProductImportTab onImportComplete={loadStats} />
+        )}
       </div>
     </div>
   );

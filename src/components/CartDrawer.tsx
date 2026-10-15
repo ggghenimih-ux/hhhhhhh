@@ -8,7 +8,6 @@ import {
 } from '../context/StoreSlices';
 import { getSafeImageUrl, handleImageError } from '../utils/image';
 import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
-import { MAX_ORDER_QUANTITY } from '../utils/stock';
 import {
   X,
   ShoppingCart,
@@ -209,7 +208,6 @@ export const CartDrawer: React.FC = () => {
                             onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.selectedVariant?.id)}
                             aria-label={`${language === 'ar' ? 'زيادة كمية' : 'Augmenter la quantité de'} ${name}`}
                             className="p-1 hover:bg-white text-slate-600 rounded-r-lg"
-                            disabled={item.quantity >= MAX_ORDER_QUANTITY}
                           >
                             <Plus className="w-3 h-3" />
                           </button>

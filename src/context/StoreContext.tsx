@@ -16,11 +16,9 @@ import { TRANSLATIONS } from '../translations';
 import { api } from '../services/api';
 import { useAuth } from './AuthContext';
 import { StoreSlicesProvider } from './StoreSlices';
-import { PRODUCTS_DATA, CATEGORIES_DATA } from '../data/mockData';
 import { DEFAULT_STORE_SETTINGS, initialFilters } from './storeDefaults';
 import { AppRoute, RouteParams, StoreContextType, ToastMessage } from './storeTypes';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { MAX_ORDER_QUANTITY } from '../utils/stock';
 
 export type { AppRoute, RouteParams, StoreContextType, ToastMessage } from './storeTypes';
 
@@ -266,8 +264,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [filters, setFiltersState] = useState<FilterState>(initialFilters);
   const [productPage, setProductPage] = useState(1);
   const [productPagination, setProductPagination] = useState({ page: 1, totalPages: 1, total: 0 });
-  const [products, setProducts] = useState<Product[]>(import.meta.env.DEV ? PRODUCTS_DATA : []);
-  const [categories, setCategories] = useState<Category[]>(import.meta.env.DEV ? CATEGORIES_DATA : []);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [productsError, setProductsError] = useState<string | null>(null);
@@ -295,7 +293,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         category: currentFilters.category || undefined,
         minPrice: currentFilters.minPrice || undefined,
         maxPrice: currentFilters.maxPrice < 2000 ? currentFilters.maxPrice : undefined,
-        inStock: currentFilters.inStockOnly ? 'true' : undefined,
         admin: user?.role === 'ADMIN' ? 'true' : undefined,
       });
       if (!Array.isArray(res?.data)) {
@@ -310,12 +307,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
     } catch (err) {
       if (requestId !== productRequestId.current) return;
-      if (import.meta.env.DEV) {
-        setProducts(PRODUCTS_DATA);
-      } else {
-        setProducts([]);
-        setProductsError(err instanceof Error ? err.message : 'Impossible de charger les produits.');
-      }
+      setProducts([]);
+      setProductsError(err instanceof Error ? err.message : 'Impossible de charger les produits.');
     } finally {
       if (requestId === productRequestId.current) setIsLoadingProducts(false);
     }
@@ -330,7 +323,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch (err) {
       console.warn('Unable to load categories from the server:', err);
-      setCategories(import.meta.env.DEV ? CATEGORIES_DATA : []);
+      setCategories([]);
     } finally {
       setIsLoadingCategories(false);
     }
@@ -381,7 +374,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             return {
               ...item,
               product,
-              quantity: Math.min(item.quantity, MAX_ORDER_QUANTITY),
+              quantity: item.quantity,
             };
           }),
         );
@@ -531,11 +524,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const newQty = next[existingIndex].quantity + quantity;
         next[existingIndex] = {
           ...next[existingIndex],
-          quantity: Math.min(newQty, MAX_ORDER_QUANTITY),
+          quantity: newQty,
         };
         return next;
       } else {
-        return [...prev, { product, quantity: Math.min(quantity, MAX_ORDER_QUANTITY), selectedVariant: variant }];
+        return [...prev, { product, quantity, selectedVariant: variant }];
       }
     });
 
@@ -563,7 +556,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCart((prev) =>
       prev.map((item) => {
         if (item.product.id === productId && item.selectedVariant?.id === variantId) {
-          return { ...item, quantity: Math.min(quantity, MAX_ORDER_QUANTITY) };
+          return { ...item, quantity };
         }
         return item;
       })
@@ -631,10 +624,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     if (price < filters.minPrice || price > filters.maxPrice) {
-      return false;
-    }
-
-    if (filters.inStockOnly && product.stock <= 0) {
       return false;
     }
 

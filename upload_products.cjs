@@ -46,7 +46,6 @@ async function uploadData() {
         name: p.name || '',
         price: Number(p.price) || 0,
         category: p.category || '',
-        stock: Number(p.stock) || 0,
         currency: p.currency || 'TND',
         updatedAt: new Date().toISOString()
       }, { merge: true });

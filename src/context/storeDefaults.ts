@@ -33,7 +33,6 @@ export const initialFilters: FilterState = {
   brand: null,
   minPrice: 0,
   maxPrice: 2000,
-  inStockOnly: false,
   discountOnly: false,
   searchQuery: '',
   sortBy: 'popularity',

@@ -4,8 +4,6 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
 const app = getApps().length ? getApp() : initializeApp();
 const db = getFirestore(app);
-const unlimitedStock = 999_999;
-const maxOrderQuantity = 100;
 const maxOrderItems = 30;
 
 type RequestedItem = {
@@ -63,24 +61,14 @@ export const createOrder = onCall(
         || !item.productId.trim()
         || !Number.isSafeInteger(item.quantity)
         || item.quantity < 1
-        || item.quantity > maxOrderQuantity
       ) {
         throw new HttpsError('invalid-argument', 'Une ligne de commande est invalide.');
       }
       return { productId: item.productId.trim(), quantity: item.quantity };
     });
 
-    const quantities = new Map<string, number>();
-    requestedItems.forEach(({ productId, quantity }) => {
-      quantities.set(productId, (quantities.get(productId) ?? 0) + quantity);
-    });
-    for (const quantity of quantities.values()) {
-      if (quantity > maxOrderQuantity) {
-        throw new HttpsError('invalid-argument', 'La quantité totale dépasse la limite autorisée.');
-      }
-    }
-
-    const productRefs = [...quantities.keys()].map((id) => db.collection('products').doc(id));
+    const productIds = [...new Set(requestedItems.map(({ productId }) => productId))];
+    const productRefs = productIds.map((id) => db.collection('products').doc(id));
     const settingsRef = db.collection('settings').doc('store');
     const requestId = typeof input.requestId === 'string'
       && /^[A-Za-z0-9_-]{20,64}$/.test(input.requestId)
@@ -147,20 +135,6 @@ export const createOrder = onCall(
       const discountAmount = couponCode ? roundTnd(subtotalTND * 0.1) : 0;
       const totalTND = roundTnd(subtotalTND - discountAmount + shippingTND);
       const userId = request.auth?.uid ?? null;
-
-      quantities.forEach((quantity, productId) => {
-        const product = productsById.get(productId)!;
-        const stock = Number(product.stock ?? 0);
-        if (!Number.isFinite(stock) || (stock !== unlimitedStock && stock < quantity)) {
-          throw new HttpsError('failed-precondition', 'Le stock d’un produit est insuffisant.');
-        }
-        if (stock !== unlimitedStock) {
-          transaction.update(db.collection('products').doc(productId), {
-            stock: stock - quantity,
-            updatedAt: createdAt,
-          });
-        }
-      });
 
       const data: DocumentData = {
         id: orderRef.id,

@@ -82,6 +82,7 @@ export const HomePage: React.FC = () => {
         <ProductGrid
           products={featuredProducts.length > 0 ? featuredProducts : products.slice(0, 8)}
           isLoading={isLoadingProducts}
+          emptyMessage={language === 'ar' ? 'لا توجد منتجات في الكتالوج حالياً' : 'Le catalogue ne contient aucun produit pour le moment.'}
         />
       </section>
 

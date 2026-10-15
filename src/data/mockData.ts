@@ -249,7 +249,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 890.0,
     originalPrice: 980.0,
     discount: 9,
-    stock: 7,
     images: [
       'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
       'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=800&q=80',
@@ -291,7 +290,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 460.0,
     originalPrice: 520.0,
     discount: 12,
-    stock: 12,
     images: [
       'https://images.unsplash.com/photo-1597733336794-12d05021d510?auto=format&fit=crop&w=800&q=80',
       'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
@@ -335,7 +333,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 1390.0,
     originalPrice: 1550.0,
     discount: 10,
-    stock: 4,
     images: [
       'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80',
       'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=800&q=80',
@@ -379,7 +376,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 380.0,
     originalPrice: 420.0,
     discount: 9,
-    stock: 9,
     images: [
       'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=800&q=80',
     ],
@@ -418,7 +414,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 95.0,
     originalPrice: 115.0,
     discount: 17,
-    stock: 22,
     images: [
       'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
     ],
@@ -455,7 +450,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 590.0,
     originalPrice: 650.0,
     discount: 9,
-    stock: 6,
     images: [
       'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80',
     ],
@@ -497,7 +491,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 340.0,
     originalPrice: 380.0,
     discount: 11,
-    stock: 8,
     images: [
       'https://images.unsplash.com/photo-1598327105666-5b89351aff97?auto=format&fit=crop&w=800&q=80',
     ],
@@ -534,7 +527,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 35.0,
     originalPrice: 45.0,
     discount: 22,
-    stock: 45,
     images: [
       'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
     ],
@@ -575,7 +567,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 42.0,
     originalPrice: 50.0,
     discount: 16,
-    stock: 35,
     images: [
       'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
     ],
@@ -609,7 +600,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 28.0,
     originalPrice: 35.0,
     discount: 20,
-    stock: 60,
     images: [
       'https://images.unsplash.com/photo-1603555501671-8f96b3fce8b4?auto=format&fit=crop&w=800&q=80',
     ],
@@ -644,7 +634,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 25.0,
     originalPrice: 30.0,
     discount: 16,
-    stock: 80,
     images: [
       'https://images.unsplash.com/photo-1603555501671-8f96b3fce8b4?auto=format&fit=crop&w=800&q=80',
     ],
@@ -679,7 +668,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 32.0,
     originalPrice: 38.0,
     discount: 15,
-    stock: 50,
     images: [
       'https://images.unsplash.com/photo-1597733336794-12d05021d510?auto=format&fit=crop&w=800&q=80',
     ],
@@ -714,7 +702,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 38.0,
     originalPrice: 45.0,
     discount: 15,
-    stock: 28,
     images: [
       'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800&q=80',
     ],
@@ -747,7 +734,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 360.0,
     originalPrice: 410.0,
     discount: 12,
-    stock: 5,
     images: [
       'https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=800&q=80',
     ],
@@ -783,7 +769,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 65.0,
     originalPrice: 80.0,
     discount: 18,
-    stock: 18,
     images: [
       'https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=800&q=80',
     ],
@@ -818,7 +803,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 75.0,
     originalPrice: 95.0,
     discount: 21,
-    stock: 30,
     images: [
       'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80',
     ],

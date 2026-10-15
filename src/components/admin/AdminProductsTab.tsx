@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { api } from '../../services/api';
 import { useDialogAccessibility } from '../../hooks/useDialogAccessibility';
-import { isUnlimitedStock } from '../../utils/stock';
 import {
   Package,
   Plus,
@@ -67,7 +66,6 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
   const [formCategory, setFormCategory] = useState('');
   const [formPrice, setFormPrice] = useState<number>(45);
   const [formComparePrice, setFormComparePrice] = useState<number>(0);
-  const [formStock, setFormStock] = useState<number>(10);
   const [formSku, setFormSku] = useState('');
   const [formBrand, setFormBrand] = useState('Mechanic');
   const [formWarranty, setFormWarranty] = useState('6 Mois');
@@ -147,7 +145,6 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
     setFormCategory(categories[0]?.slug || 'soldering-hot-air');
     setFormPrice(45);
     setFormComparePrice(0);
-    setFormStock(10);
     setFormSku(`GSM-${Math.floor(1000 + Math.random() * 9000)}`);
     setFormBrand('Mechanic');
     setFormWarranty('6 Mois');
@@ -168,7 +165,6 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
     setFormCategory(prod.category || categories[0]?.slug || 'soldering-hot-air');
     setFormPrice(prod.priceTND || prod.price || 0);
     setFormComparePrice(prod.compareAtPriceTND || prod.compareAtPrice || 0);
-    setFormStock(isUnlimitedStock(prod.stock) ? 0 : prod.stock ?? 0);
     setFormSku(prod.sku || '');
     setFormBrand(prod.brand || prod.specs?.brand || 'Mechanic');
     setFormWarranty(prod.warranty || '6 Mois');
@@ -235,7 +231,6 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
         category: formCategory,
         priceTND: Number(formPrice),
         compareAtPriceTND: Number(formComparePrice) > 0 ? Number(formComparePrice) : null,
-        stock: Number(formStock),
         sku: formSku.trim(),
         brand: formBrand.trim(),
         warranty: formWarranty.trim(),

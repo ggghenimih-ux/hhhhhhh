@@ -8,7 +8,7 @@ const DRY = process.argv.includes('--dry-run');
 const ALLOW_UNCAT = process.argv.includes('--allow-uncategorized');
 const products = JSON.parse(fs.readFileSync(path.join(__dirname, 'products_import.json'), 'utf8'));
 
-const bad = products.filter(p => !p.name || !(p.price > 0) || !Number.isInteger(p.stock));
+const bad = products.filter(p => !p.name || !(p.price > 0));
 if (bad.length) { console.error('Produits invalides :', bad.slice(0, 5)); process.exit(1); }
 const uncategorized = products.filter(p => !p.category);
 if (uncategorized.length && !ALLOW_UNCAT) {
@@ -27,7 +27,7 @@ const db = admin.firestore();
   for (let i = 0; i < products.length; i += 400) {            // limite Firestore : 500 écritures/batch
     const batch = db.batch();
     for (const p of products.slice(i, i + 400)) {
-      const { id, source, ...data } = p;
+      const { id, source, stock, ...data } = p;
       batch.set(db.collection('products').doc(id), { ...data, currency: 'TND', updatedAt: now }, { merge: true });
     }
     await batch.commit();

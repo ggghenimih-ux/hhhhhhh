@@ -23,7 +23,6 @@ interface AdminOverviewTabProps {
     catalogProducts?: number;
     totalCategories?: number;
     deliveredOrders?: number;
-    lowStockProducts: number;
     recentOrders?: any[];
   };
   onNavigateTab: (tab: 'products' | 'orders' | 'categories' | 'settings' | 'media') => void;

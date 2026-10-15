@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useAuth } from '../context/AuthContext';
-import { isAvailable, MAX_ORDER_QUANTITY } from '../utils/stock';
 import { api } from '../services/api';
 import { Product, Review } from '../types';
 import { getSafeImageUrl, handleImageError } from '../utils/image';
@@ -79,9 +78,7 @@ export const ProductDetailPage: React.FC = () => {
         '@type': 'Offer',
         priceCurrency: 'TND',
         price: getProductPrice(product),
-        availability: isAvailable(product.stock)
-          ? 'https://schema.org/InStock'
-          : 'https://schema.org/OutOfStock',
+        availability: 'https://schema.org/InStock',
         url: window.location.href,
       },
     });
@@ -366,10 +363,9 @@ export const ProductDetailPage: React.FC = () => {
                   {quantity}
                 </span>
                 <button
-                  onClick={() => setQuantity((q) => Math.min(MAX_ORDER_QUANTITY, q + 1))}
+                  onClick={() => setQuantity((q) => q + 1)}
                   aria-label={language === 'ar' ? 'زيادة الكمية' : 'Augmenter la quantité'}
                   className="p-2 rounded-lg hover:bg-white text-slate-600 transition"
-                  disabled={quantity >= MAX_ORDER_QUANTITY}
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -469,16 +465,18 @@ export const ProductDetailPage: React.FC = () => {
         {/* Tab 1: Specs Table */}
         {activeTab === 'specs' && (
           <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
-            {product.specs && Object.keys(product.specs).length > 0 ? (
+            {product.specs && Object.keys(product.specs).some((key) => !['source', 'remarque'].includes(key.toLocaleLowerCase())) ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                {Object.entries(product.specs).map(([k, val]) => (
+                {Object.entries(product.specs)
+                  .filter(([key]) => !['source', 'remarque'].includes(key.toLocaleLowerCase()))
+                  .map(([k, val]) => (
                   <div key={k} className="p-3 bg-white rounded-xl border border-slate-200 flex justify-between">
                     <span className="text-slate-500 font-semibold capitalize">
                       {k.replace(/([A-Z])/g, ' $1')}
                     </span>
                     <strong className="text-slate-900">{String(val)}</strong>
                   </div>
-                ))}
+                  ))}
               </div>
             ) : (
               <p className="text-xs text-slate-500">Spécifications standards d’atelier.</p>

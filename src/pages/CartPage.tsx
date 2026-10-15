@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { getSafeImageUrl, handleImageError } from '../utils/image';
-import { MAX_ORDER_QUANTITY } from '../utils/stock';
 import {
   ShoppingCart,
   Trash2,
@@ -162,7 +161,6 @@ export const CartPage: React.FC = () => {
                     onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.selectedVariant?.id)}
                     aria-label={`Augmenter la quantité de ${name}`}
                     className="p-1.5 hover:bg-white text-slate-600 transition"
-                    disabled={item.quantity >= MAX_ORDER_QUANTITY}
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>

@@ -32,6 +32,36 @@ export interface ApiResponse<T = any> {
 
 type DocumentData = Record<string, any>;
 
+export const IMPORT_PRODUCT_CATEGORIES = [
+  'Accessories',
+  'Equipments Tools',
+  'IC Chips',
+  'Measuring And Power Supply',
+  'Microscopes',
+  'Programming And Flashing',
+  'Screen Refurbish Tools',
+  'Soldering And Hot Air',
+  'Spare Parts',
+] as const;
+
+export interface ImportedProduct {
+  ref: string;
+  name: string;
+  priceTND: number;
+  category: string;
+  image: string;
+}
+
+export interface ProductImportResult {
+  created: number;
+  updated: number;
+  failed: number;
+  errors: Array<{ ref: string; message: string }>;
+}
+
+const categorySlug = (name: string) =>
+  name.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
 const asIsoStrings = (value: any): any => {
   if (value && typeof value.toDate === 'function') return value.toDate().toISOString();
   if (Array.isArray(value)) return value.map(asIsoStrings);
@@ -98,7 +128,6 @@ export const api = {
       const isAdmin = params.admin === 'true';
       if (!isAdmin) products = products.filter((product) => product.isActive !== false);
       if (params.category) products = products.filter((product) => product.category === params.category);
-      if (params.inStock === 'true') products = products.filter((product) => Number(product.stock) > 0);
       if (params.minPrice !== undefined) {
         products = products.filter((product) => Number(product.priceTND ?? product.price) >= Number(params.minPrice));
       }
@@ -237,6 +266,150 @@ export const api = {
     },
   },
 
+  productImport: {
+    getExistingCategories: async () => {
+      const categories = await getCollection('categories');
+      return categories.filter((category) => {
+        const name = typeof category.name === 'string'
+          ? category.name
+          : category.name?.en ?? category.name?.fr ?? '';
+        return IMPORT_PRODUCT_CATEGORIES.some(
+          (knownName) => name.trim().toLocaleLowerCase() === knownName.toLocaleLowerCase(),
+        );
+      });
+    },
+    import: async (
+      products: ImportedProduct[],
+      onProgress: (completed: number, total: number) => void,
+    ): Promise<ProductImportResult> => {
+      const result: ProductImportResult = { created: 0, updated: 0, failed: 0, errors: [] };
+      const categoriesSnapshot = await getDocs(collection(db, 'categories'));
+      const existingCategories = new Set(categoriesSnapshot.docs.flatMap((category) => {
+        const name = category.data().name;
+        const label = typeof name === 'string' ? name : name?.en ?? name?.fr ?? '';
+        return [label.trim().toLocaleLowerCase(), categorySlug(String(category.data().slug ?? ''))];
+      }));
+      const missingCategories = IMPORT_PRODUCT_CATEGORIES.filter(
+        (name) => !existingCategories.has(name.toLocaleLowerCase())
+          && !existingCategories.has(categorySlug(name)),
+      );
+
+      if (missingCategories.length > 0) {
+        const categoriesBatch = writeBatch(db);
+        missingCategories.forEach((name) => {
+          const slug = categorySlug(name);
+          categoriesBatch.set(doc(db, 'categories', slug), {
+            name,
+            slug,
+            description: '',
+            isActive: true,
+            order: IMPORT_PRODUCT_CATEGORIES.indexOf(name) + 1,
+          }, { merge: true });
+        });
+        await categoriesBatch.commit();
+      }
+
+      const refreshedCategories = await getDocs(collection(db, 'categories'));
+      const categorySlugs = new Map<string, string>();
+      refreshedCategories.docs.forEach((category) => {
+        const data = category.data();
+        const label = typeof data.name === 'string' ? data.name : data.name?.en ?? data.name?.fr ?? '';
+        const normalizedName = label.trim().toLocaleLowerCase();
+        const knownName = IMPORT_PRODUCT_CATEGORIES.find(
+          (name) => name.toLocaleLowerCase() === normalizedName || categorySlug(name) === data.slug,
+        );
+        if (knownName) categorySlugs.set(knownName, data.slug || categorySlug(knownName));
+      });
+      const unavailableCategories = IMPORT_PRODUCT_CATEGORIES.filter((name) => !categorySlugs.has(name));
+      if (unavailableCategories.length > 0) {
+        throw new Error(`Catégories introuvables après création : ${unavailableCategories.join(', ')}.`);
+      }
+
+      const preparedProducts: Array<{
+        ref: string;
+        data: DocumentData;
+        exists: boolean;
+      }> = [];
+
+      for (const product of products) {
+        try {
+          const ref = product.ref.trim();
+          const priceTND = Number(product.priceTND);
+          const category = IMPORT_PRODUCT_CATEGORIES.find(
+            (name) => name.toLocaleLowerCase() === product.category.toLocaleLowerCase(),
+          );
+          if (!ref) throw new Error('Référence vide.');
+          if (!Number.isFinite(priceTND) || priceTND < 0) throw new Error('Prix invalide.');
+          if (!category) throw new Error(`Catégorie inconnue : ${product.category}.`);
+
+          const productRef = doc(db, 'products', ref);
+          const existing = await getDoc(productRef);
+          const now = new Date().toISOString();
+          const name = product.name.trim();
+          const image = product.image.trim()
+            ? `/products/${product.image.trim().replace(/^\/+/, '')}`
+            : '/logo.jpg';
+          const data: DocumentData = {
+            name,
+            priceTND,
+            category: categorySlugs.get(category)!,
+            image,
+            images: [image],
+            brand: typeof existing.data()?.brand === 'string' ? existing.data()!.brand : '',
+          };
+          if (!existing.exists()) {
+            data.slug = ref;
+            data.createdAt = now;
+          }
+
+          preparedProducts.push({ ref, data, exists: existing.exists() });
+        } catch (error) {
+          result.failed += 1;
+          result.errors.push({
+            ref: product.ref,
+            message: error instanceof Error ? error.message : 'Erreur inconnue.',
+          });
+        }
+      }
+
+      for (let offset = 0; offset < preparedProducts.length; offset += 450) {
+        const chunk = preparedProducts.slice(offset, offset + 450);
+        const batch = writeBatch(db);
+        chunk.forEach((product) => {
+          batch.set(doc(db, 'products', product.ref), product.data, { merge: true });
+        });
+        try {
+          await batch.commit();
+          chunk.forEach((product) => {
+            if (product.exists) result.updated += 1;
+            else result.created += 1;
+          });
+        } catch (batchError) {
+          for (const product of chunk) {
+            try {
+              await setDoc(doc(db, 'products', product.ref), product.data, { merge: true });
+              if (product.exists) result.updated += 1;
+              else result.created += 1;
+            } catch (error) {
+              result.failed += 1;
+              result.errors.push({
+                ref: product.ref,
+                message: error instanceof Error
+                  ? error.message
+                  : batchError instanceof Error
+                    ? batchError.message
+                    : 'Échec de l’écriture Firestore.',
+              });
+            }
+          }
+        }
+        onProgress(Math.min(offset + chunk.length, products.length), products.length);
+      }
+
+      return result;
+    },
+  },
+
   orders: {
     create: async (orderData: DocumentData): Promise<ApiResponse<any>> => {
       const result = await createOrderCallable({
@@ -297,7 +470,6 @@ export const api = {
           catalogProducts: products.length,
           totalCategories: categories.length,
           deliveredOrders: orders.filter((order) => order.status === 'DELIVERED').length,
-          lowStockProducts: products.filter((product) => Number(product.stock) > 0 && Number(product.stock) <= Number(product.lowStockThreshold ?? 5)).length,
           recentOrders: orders.sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? ''))).slice(0, 5),
         },
       };
