@@ -52,4 +52,16 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
   // Deletion & Confirmation Modal State
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [productToDelete, setProductToDelete] = useState<any | null>(null);
-  const deleteDialogRef = useDialogAccessibility(Boolean(productToDelete), () => setProductToDelete(
+  const deleteDialogRef = useDialogAccessibility(Boolean(productToDelete), () => setProductToDelete(null));
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Gestion des Produits</h2>
+          <p className="text-sm text-gray-500">Gérez votre catalogue de produits et stocks.</p>
+        </div>
+      </div>
+    </div>
+  );
+};

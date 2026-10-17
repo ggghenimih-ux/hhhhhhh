@@ -664,7 +664,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
 
       const { collection, addDoc } = await import('firebase/firestore');
-      const { db } = await import('../config/firebase');
+      const { db } = await import('../services/firebase');
 
       const ordersRef = collection(db, 'orders');
       const docRef = await addDoc(ordersRef, payload);
