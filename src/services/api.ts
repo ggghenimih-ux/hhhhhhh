@@ -89,7 +89,7 @@ const getProductWithReviews = async (id: string, data: DocumentData) => {
   return { ...documentData(id, data), reviews, reviewsCount: reviews.length };
 };
 
-const UPLOAD_URL = 'https://medias.outilsreparationgsm.tn/upload.php';
+const UPLOAD_URL = 'https://media.outilsreparationgsm.tn/upload.php';
 
 const uploadImage = async (file: File) => {
   if (!file.type.startsWith('image/')) throw new Error('Le fichier doit être une image.');
