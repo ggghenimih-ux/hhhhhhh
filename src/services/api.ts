@@ -89,37 +89,32 @@ const getProductWithReviews = async (id: string, data: DocumentData) => {
   return { ...documentData(id, data), reviews, reviewsCount: reviews.length };
 };
 
+const UPLOAD_URL = 'https://www.outilsreparationgsm.tn/upload.php';
+
 const uploadImage = async (file: File) => {
   if (!file.type.startsWith('image/')) throw new Error('Le fichier doit être une image.');
-
+  if (file.size > 5 * 1024 * 1024) throw new Error('Image trop lourde (5 Mo max).');
+  const user = auth.currentUser;
+  if (!user) throw new Error('Connexion requise.');
   const formData = new FormData();
   formData.append('image', file);
-
-  const token = await auth.currentUser?.getIdToken();
-  if (token) formData.append('token', token);
-
-  const response = await fetch('https://www.outilsreparationgsm.tn/upload.php', {
-    method: 'POST',
-    body: formData,
-  });
-
-  let data: { success?: boolean; url?: string; filename?: string; error?: string; message?: string };
+  formData.append('token', await user.getIdToken());
+  let response: Response;
   try {
-    data = await response.json();
+    response = await fetch(UPLOAD_URL, { method: 'POST', body: formData });
   } catch {
-    throw new Error(`Réponse invalide du serveur de téléchargement (${response.status}).`);
+    throw new Error("Serveur d'upload injoignable (domaine ou CORS).");
   }
-
-  if (!response.ok || !data.success || typeof data.url !== 'string' || !data.url.trim()) {
-    throw new Error(
-      data.message || data.error || `Erreur lors du téléchargement de l’image (${response.status}).`,
-    );
+  let data: any;
+  try {
+    data = JSON.parse(await response.text());
+  } catch {
+    throw new Error(`Réponse invalide du serveur d'upload (HTTP ${response.status}).`);
   }
-
-  return {
-    url: data.url,
-    filename: data.filename || file.name,
-  };
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Erreur lors du téléchargement de l'image.");
+  }
+  return { url: data.url as string, filename: file.name };
 };
 
 const getOrders = async () => {

@@ -162,7 +162,7 @@ export const AdminDashboardPage: React.FC = () => {
                 Panneau d'Administration CMS
               </h1>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                BDD SQLite Connectée
+                Firebase Firestore connecté
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
