@@ -1,4 +1,6 @@
 node_modules/
+functions/lib/
+functions/node_modules/
 build/
 dist/
 coverage/
@@ -7,10 +9,18 @@ coverage/
 .env*
 !.env.example
 !.env.notifications.example
+my-key.json
+SECURITY_REVIEW.md
 
 # Local database & user uploads must never be committed
 prisma/*.db
 prisma/*.db-journal
+tools/import/preserved/*.db
+tools/import/preserved/*.db-wal
+tools/import/preserved/*.db-shm
+tools/import/backup/*.db
+tools/import/backup/*.db-wal
+tools/import/backup/*.db-shm
 uploads/
 !public/uploads/
 !public/uploads/products/

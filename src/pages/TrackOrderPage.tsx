@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStoreRouting, useStoreSettings } from '../context/StoreSlices';
 import { api } from '../services/api';
+import { getOrderTotal } from '../lib/orderTotals';
 import {
   PackageSearch,
   CheckCircle2,
@@ -21,6 +22,27 @@ export const TrackOrderPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const loadByTrackingToken = async (token: string) => {
+    try {
+      setIsLoading(true);
+      setErrorMsg('');
+      setSearched(true);
+      const result = await api.orders.getById(token);
+      if (result?.data) {
+        setOrder(result.data);
+        setSearchNumber(result.data.orderNumber);
+      } else {
+        setOrder(null);
+        setErrorMsg('Aucune commande trouvée avec ce lien de suivi.');
+      }
+    } catch (error) {
+      setOrder(null);
+      setErrorMsg(error instanceof Error ? error.message : 'Impossible de charger cette commande.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const performSearch = async (num: string) => {
     if (!num.trim()) return;
@@ -45,8 +67,7 @@ export const TrackOrderPage: React.FC = () => {
 
   useEffect(() => {
     if (routeParams.orderNumber) {
-      setSearchNumber(routeParams.orderNumber);
-      performSearch(routeParams.orderNumber);
+      void loadByTrackingToken(routeParams.orderNumber);
     }
   }, [routeParams.orderNumber]);
 
@@ -209,7 +230,7 @@ export const TrackOrderPage: React.FC = () => {
               <span className="text-[10px] uppercase font-bold text-orange-600 block mb-1">Paiement & Montant</span>
               <div className="flex justify-between">
                 <span>Total commande :</span>
-                <strong className="text-orange-600">{formatPrice(order.totalTND)}</strong>
+                <strong className="text-orange-600">{formatPrice(getOrderTotal(order))}</strong>
               </div>
               <div className="flex justify-between mt-1">
                 <span>Mode de paiement :</span>

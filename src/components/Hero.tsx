@@ -6,7 +6,7 @@ export const Hero: React.FC = () => {
   const { language, navigateTo, settings } = useStore();
 
   const title = settings?.heroTitle || (language === 'ar' ? 'معدات وأدوات صيانة الهواتف الذكية للمحترفين' : 'Outillage & Équipements Professionnels GSM en Tunisie');
-  const subtitle = settings?.heroSubtitle || (language === 'ar' ? 'محطات لحام دقيقة، ميكروسكوبات ثلاثية العيون، مبرمجات سوفتوير، ومزودات طاقة أصلية مع توصيل سريع 24/48 ساعة وضمان حقيقي.' : 'Stations de soudure haute précision, microscopes trinoculaires, programmeurs JCID et pièces certifiées avec livraison rapide.');
+  const subtitle = settings?.heroSubtitle || (language === 'ar' ? 'محطات لحام دقيقة، ميكروسكوبات ثلاثية العيون، مبرمجات سوفتوير، ومزودات طاقة أصلية مع توصيل سريع 24/48 ساعة.' : 'Stations de soudure haute précision, microscopes trinoculaires, programmeurs JCID et pièces certifiées avec livraison rapide.');
   const buttonText = settings?.heroButtonText || (language === 'ar' ? 'عرض جميع المنتجات' : 'Voir tout le catalogue');
   const buttonLink = settings?.heroButtonLink || 'products';
   const logoOrHeroImg = settings?.heroImage?.trim() || settings?.logoUrl?.trim() || '/logo.jpg';
@@ -89,14 +89,14 @@ export const Hero: React.FC = () => {
                     <span>{language === 'ar' ? 'توصيل 24/48h' : 'Livraison 24/48h'}</span>
                   </span>
                   <span className="text-[11px] text-slate-500">
-                    {language === 'ar' ? `شحن ${settings?.defaultShippingTND ?? 7} DT` : `Frais: ${settings?.defaultShippingTND ?? 7} DT`}
+                    {language === 'ar' ? `شحن ${settings.defaultShippingTND} DT` : `Frais: ${settings.defaultShippingTND} DT`}
                   </span>
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
                   <span className="flex items-center gap-1.5 font-bold text-slate-900 mb-0.5">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>{language === 'ar' ? 'ضمان حقيقي' : 'Garantie Réelle'}</span>
+                    <span>{language === 'ar' ? 'فحص الجودة' : 'Contrôle qualité'}</span>
                   </span>
                   <span className="text-[11px] text-slate-500">
                     {language === 'ar' ? 'منتجات أصلية مختبرة' : 'Produits 100% testés'}
@@ -104,9 +104,8 @@ export const Hero: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-1 flex items-center justify-between text-xs text-slate-500">
+              <div className="pt-1 text-xs text-slate-500">
                 <span>{language === 'ar' ? 'الدفع نقداً عند الاستلام' : 'Paiement en espèces à la livraison'}</span>
-                <span className="font-semibold text-slate-700">Tunis · Sousse · Sfax</span>
               </div>
             </div>
           </div>

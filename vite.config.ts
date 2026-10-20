@@ -15,4 +15,12 @@ export default defineConfig({
     hmr: process.env.DISABLE_HMR !== 'true',
     watch: process.env.DISABLE_HMR === 'true' ? null : {},
   },
+  build: {
+    rollupOptions: {
+      input: {
+        index: path.resolve(__dirname, 'index.html'),
+        maintenance: path.resolve(__dirname, 'maintenance.html'),
+      },
+    },
+  },
 });

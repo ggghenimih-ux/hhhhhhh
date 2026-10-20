@@ -3,6 +3,7 @@ import {
   useStoreCart,
   useStoreNotifications,
   useStoreRouting,
+  useStoreProducts,
   useStoreSettings,
 } from '../context/StoreSlices';
 import { CONFIG } from '../config/index';
@@ -21,7 +22,8 @@ import {
 } from 'lucide-react';
 
 export const CheckoutPage: React.FC = () => {
-  const { t, language, formatPrice } = useStoreSettings();
+  const { t, language, formatPrice, settings } = useStoreSettings();
+  const { getLocalizedName, getProductPrice } = useStoreProducts();
   const {
     cart,
     cartSubtotal,
@@ -51,15 +53,35 @@ export const CheckoutPage: React.FC = () => {
     setErrorMessage('');
 
     // Phone validation
-    const cleanPhone = customerPhone.replace(/[\s\-\(\)\.]/g, '').replace(/^\+216/, '');
+    const cleanPhone = customerPhone.replace(/[\s\-\(\)\.]/g, '').replace(/^\+?216/, '');
     if (!/^[24579]\d{7}$/.test(cleanPhone)) {
       setErrorMessage('Numéro de téléphone tunisien invalide (8 chiffres commençant par 2, 4, 5, 7 ou 9).');
       showToast('Numéro de téléphone tunisien invalide.', 'error');
       return;
     }
 
-    if (!customerName.trim() || !address.trim()) {
-      setErrorMessage('Veuillez renseigner votre nom et votre adresse de livraison.');
+    if (customerName.trim().length < 2 || customerName.trim().length > 120) {
+      setErrorMessage('Veuillez saisir votre nom complet (2 à 120 caractères).');
+      return;
+    }
+    if (customerEmail.trim().length > 254) {
+      setErrorMessage('L’adresse e-mail ne peut pas dépasser 254 caractères.');
+      return;
+    }
+    if (!governorate.trim() || governorate.trim().length > 100) {
+      setErrorMessage('Veuillez choisir un gouvernorat valide.');
+      return;
+    }
+    if (delegation.trim().length > 120) {
+      setErrorMessage('La ville ou délégation ne peut pas dépasser 120 caractères.');
+      return;
+    }
+    if (address.trim().length < 1 || address.trim().length > 500) {
+      setErrorMessage('L’adresse est obligatoire et ne peut pas dépasser 500 caractères.');
+      return;
+    }
+    if (notes.trim().length > 1000) {
+      setErrorMessage('Les instructions ne peuvent pas dépasser 1000 caractères.');
       return;
     }
 
@@ -69,6 +91,24 @@ export const CheckoutPage: React.FC = () => {
       return;
     }
 
+    if (cart.some((item) => item.product.isOutOfStock === true)) {
+      const message = language === 'ar'
+        ? 'أزل المنتجات غير المتوفرة من السلة قبل تأكيد الطلب.'
+        : 'Retirez les produits en rupture de stock du panier avant de confirmer la commande.';
+      setErrorMessage(message);
+      showToast(message, 'error');
+      return;
+    }
+
+    const submitEvent = e.nativeEvent instanceof SubmitEvent ? e.nativeEvent : null;
+    const requestedWhatsApp = submitEvent?.submitter instanceof HTMLButtonElement
+      && submitEvent.submitter.value === 'whatsapp';
+    const whatsappNumber = settings.whatsappNumber;
+    const canSendToWhatsApp = /^[1-9]\d{7,14}$/.test(whatsappNumber || '');
+    const whatsappWindow = requestedWhatsApp && canSendToWhatsApp
+      ? window.open('about:blank', '_blank')
+      : null;
+
     try {
       setIsSubmitting(true);
       const order = await createOrder({
@@ -77,19 +117,54 @@ export const CheckoutPage: React.FC = () => {
         customerEmail: customerEmail.trim() || null,
         governorate,
         delegation: delegation.trim() || null,
+        city: delegation.trim() || governorate,
         address: address.trim(),
         notes: notes.trim() || null,
         paymentMethod,
       });
 
-      // Confetti celebration
-      try {
-        confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
-      } catch {}
+      if (requestedWhatsApp && canSendToWhatsApp && whatsappWindow) {
+        const message = [
+          `Commande ${order.orderNumber}`,
+          ...order.items.map((item) => {
+            const quantity = item.qty ?? item.quantity ?? 1;
+            const unitPrice = item.unitPrice ?? item.priceTND ?? item.price ?? 0;
+            const lineTotal = item.lineTotal ?? item.totalTND ?? unitPrice * quantity;
+            const option = typeof item.variant === 'string' ? item.variant : item.variant?.name;
+            return `• ${item.name || item.productName || ''}${option ? ` — ${option}` : ''} x ${quantity} · ${formatPrice(unitPrice)} / unité = ${formatPrice(lineTotal)}`;
+          }),
+          `Frais de livraison : ${formatPrice(order.deliveryFee ?? order.shippingTND ?? shippingFee)}`,
+          `Total : ${formatPrice(order.grandTotal ?? order.totalTND ?? cartTotal)}`,
+          `Client : ${order.customerName}`,
+          `Téléphone : ${order.customerPhone}`,
+          `Gouvernorat : ${order.governorate || governorate}`,
+          `Ville : ${order.city || delegation.trim() || order.governorate || governorate}`,
+          `Adresse : ${order.address || address.trim()}`,
+          order.notes ? `Notes : ${order.notes}` : '',
+        ].filter(Boolean).join('\n');
+        const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+        try {
+          whatsappWindow.location.href = whatsappUrl;
+        } catch (error) {
+          console.error('Impossible d’ouvrir WhatsApp depuis le checkout:', error);
+          whatsappWindow.close();
+        }
+      } else if (requestedWhatsApp) {
+        whatsappWindow?.close();
+        showToast(
+          canSendToWhatsApp
+            ? 'La commande est enregistrée. Utilisez le bouton WhatsApp sur la page de confirmation.'
+            : 'La commande est enregistrée, mais le numéro WhatsApp du magasin n’est pas configuré.',
+          canSendToWhatsApp ? 'info' : 'error',
+        );
+      }
+
+      confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
 
       showToast(t.orderConfirmed, 'success');
-      navigateTo('order-success', { orderNumber: order.orderNumber });
+      navigateTo('order-success', { orderNumber: order.id });
     } catch (err: any) {
+      whatsappWindow?.close();
       const msg = err.message || 'Erreur lors de la création de la commande.';
       setErrorMessage(msg);
       showToast(msg, 'error');
@@ -138,6 +213,8 @@ export const CheckoutPage: React.FC = () => {
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Ex: Mohamed Ben Mansour"
+                  minLength={2}
+                  maxLength={120}
                   className="w-full text-xs p-3 rounded-xl border border-slate-200 outline-none focus:border-orange-500"
                   required
                 />
@@ -153,6 +230,7 @@ export const CheckoutPage: React.FC = () => {
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
                   placeholder="Ex: 26 383 876"
+                  maxLength={20}
                   className="w-full text-xs p-3 rounded-xl border border-slate-200 outline-none focus:border-orange-500 font-mono"
                   required
                 />
@@ -169,6 +247,7 @@ export const CheckoutPage: React.FC = () => {
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
                 placeholder="contact@exemple.tn"
+                maxLength={254}
                 className="w-full text-xs p-3 rounded-xl border border-slate-200 outline-none focus:border-orange-500"
               />
             </div>
@@ -210,6 +289,7 @@ export const CheckoutPage: React.FC = () => {
                   value={delegation}
                   onChange={(e) => setDelegation(e.target.value)}
                   placeholder="Ex: Centre Ville, Menzeh, Ezzahra..."
+                  maxLength={120}
                   className="w-full text-xs p-3 rounded-xl border border-slate-200 outline-none focus:border-orange-500"
                 />
               </div>
@@ -225,6 +305,7 @@ export const CheckoutPage: React.FC = () => {
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Ex: Rue Ibn Khaldoun, Immeuble 12, Atelier GSM"
+                maxLength={500}
                 className="w-full text-xs p-3 rounded-xl border border-slate-200 outline-none focus:border-orange-500"
                 required
               />
@@ -240,6 +321,7 @@ export const CheckoutPage: React.FC = () => {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Ex: Appeler 30 minutes avant le passage..."
+                maxLength={1000}
                 className="w-full text-xs p-3 rounded-xl border border-slate-200 outline-none focus:border-orange-500"
               />
             </div>
@@ -310,13 +392,21 @@ export const CheckoutPage: React.FC = () => {
 
           <div className="space-y-3 max-h-60 overflow-y-auto pr-1 divide-y divide-slate-100">
             {cart.map((item, idx) => (
-              <div key={idx} className="pt-2 flex justify-between text-xs">
-                <div className="truncate pr-2">
-                  <span className="font-bold text-orange-600">{item.quantity}x </span>
-                  <span className="text-slate-800">{item.product.name as string}</span>
+              <div key={idx} className="pt-2 flex items-start justify-between gap-3 text-xs">
+                <div className="min-w-0 flex-1 whitespace-normal break-words pr-2">
+                  <span className="font-bold text-orange-600">{item.quantity}× </span>
+                  <span className="text-slate-800">{getLocalizedName(item.product)}</span>
+                  {item.selectedVariant && (
+                    <span className="block whitespace-normal break-words text-[11px] text-slate-500">
+                      {item.selectedVariant.name}
+                    </span>
+                  )}
+                  {item.product.isOutOfStock === true && (
+                    <span className="block text-[11px] font-bold text-rose-700">{t.outOfStock}</span>
+                  )}
                 </div>
-                <strong className="text-slate-900 flex-shrink-0">
-                  {formatPrice((item.product.priceTND || 0) * item.quantity)}
+                <strong className="flex-shrink-0 whitespace-nowrap text-end text-slate-900">
+                  {formatPrice((getProductPrice(item.product) + (item.selectedVariant?.priceAdjustment || 0)) * item.quantity)}
                 </strong>
               </div>
             ))}
@@ -346,6 +436,15 @@ export const CheckoutPage: React.FC = () => {
           >
             <CheckCircle2 className="w-5 h-5" />
             <span>{isSubmitting ? 'Traitement en cours...' : 'Confirmer ma Commande'}</span>
+          </button>
+
+          <button
+            type="submit"
+            value="whatsapp"
+            disabled={isSubmitting || cart.length === 0 || !/^[1-9]\d{7,14}$/.test(settings.whatsappNumber || '')}
+            className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl border border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-bold text-xs sm:text-sm transition disabled:border-slate-300 disabled:text-slate-400 disabled:bg-slate-50"
+          >
+            <span>Commander via WhatsApp</span>
           </button>
 
           <p className="text-[11px] text-slate-500 text-center leading-relaxed">

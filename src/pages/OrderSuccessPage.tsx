@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { api } from '../services/api';
 import { Order } from '../types';
+import { getOrderTotal } from '../lib/orderTotals';
 import {
   CheckCircle2,
   Printer,
   Package,
   Phone,
+  MessageCircle,
   ArrowRight,
   FileText,
   MapPin,
@@ -16,16 +18,21 @@ export const OrderSuccessPage: React.FC = () => {
   const { t, formatPrice, lastPlacedOrder, routeParams, navigateTo, settings } = useStore();
   const [order, setOrder] = useState<Order | null>(lastPlacedOrder);
   const [isLoading, setIsLoading] = useState(!lastPlacedOrder);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (!lastPlacedOrder && routeParams.orderNumber) {
       setIsLoading(true);
+      setLoadError('');
       api.orders
-        .getByNumber(routeParams.orderNumber)
+        .getById(routeParams.orderNumber)
         .then((res) => {
           if (res?.data) setOrder(res.data);
         })
-        .catch(() => {})
+        .catch((error) => {
+          console.error('Impossible de charger la commande depuis Firestore:', error);
+          setLoadError('Impossible de charger les détails de cette commande.');
+        })
         .finally(() => setIsLoading(false));
     }
   }, [lastPlacedOrder, routeParams.orderNumber]);
@@ -41,7 +48,9 @@ export const OrderSuccessPage: React.FC = () => {
   if (!order) {
     return (
       <div className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
-        <h2 className="text-lg font-bold text-slate-900">Aucune commande récente trouvée.</h2>
+        <h2 className="text-lg font-bold text-slate-900">
+          {loadError || 'Aucune commande récente trouvée.'}
+        </h2>
         <button
           onClick={() => navigateTo('home')}
           className="px-5 py-2.5 rounded-xl bg-orange-600 text-white font-bold text-xs"
@@ -51,6 +60,28 @@ export const OrderSuccessPage: React.FC = () => {
       </div>
     );
   }
+
+  const whatsappNumber = settings.whatsappNumber;
+  const canSendToWhatsApp = /^[1-9]\d{7,14}$/.test(whatsappNumber || '');
+  const whatsappMessage = [
+    `Commande ${order.orderNumber}`,
+    ...order.items.map((item) => {
+      const quantity = item.qty ?? item.quantity ?? 1;
+      const unitPrice = item.unitPrice ?? item.priceTND ?? item.price ?? 0;
+      const lineTotal = item.lineTotal ?? item.totalTND ?? unitPrice * quantity;
+      const option = typeof item.variant === 'string' ? item.variant : item.variant?.name;
+      return `• ${item.name || item.productName || 'Article'}${option ? ` — ${option}` : ''} x ${quantity} · ${formatPrice(unitPrice)} / unité = ${formatPrice(lineTotal)}`;
+    }),
+    `Frais de livraison : ${formatPrice(order.deliveryFee ?? order.shippingTND ?? order.shippingCost)}`,
+    `Total : ${formatPrice(getOrderTotal(order))}`,
+    `Client : ${order.customerName}`,
+    `Téléphone : ${order.customerPhone}`,
+    `Gouvernorat : ${order.governorate || ''}`,
+    `Ville : ${order.city || order.delegation || order.governorate || ''}`,
+    `Adresse : ${order.address || ''}`,
+    order.notes ? `Notes : ${order.notes}` : '',
+  ].filter(Boolean).join('\n');
+  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
@@ -114,11 +145,14 @@ export const OrderSuccessPage: React.FC = () => {
                 <div>
                   <div className="font-bold text-slate-900">{item.productName || item.name}</div>
                   <div className="text-[11px] text-slate-400">
-                    Quantité : {item.quantity} × {formatPrice(item.priceTND || item.price)}
+                  Quantité : {item.qty ?? item.quantity ?? 1} × {formatPrice(item.unitPrice ?? item.priceTND ?? item.price)}
+                  </div>
+                  <div className={`text-[11px] font-bold ${item.isOutOfStock === true ? 'text-rose-700' : 'text-emerald-700'}`}>
+                    {item.isOutOfStock === true ? t.outOfStock : t.available}
                   </div>
                 </div>
                 <strong className="text-slate-900">
-                  {formatPrice(item.totalTND || (item.priceTND || 0) * item.quantity)}
+                  {formatPrice(item.lineTotal ?? item.totalTND ?? (item.unitPrice ?? item.priceTND ?? item.price ?? 0) * (item.qty ?? item.quantity ?? 1))}
                 </strong>
               </div>
             ))}
@@ -129,14 +163,14 @@ export const OrderSuccessPage: React.FC = () => {
         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5 text-xs text-slate-600">
           <div className="flex justify-between">
             <span>{t.subtotal}</span>
-            <strong className="text-slate-900">{formatPrice(order.subtotalTND ?? order.subtotal)}</strong>
+            <strong className="text-slate-900">{formatPrice(order.subtotal ?? order.subtotalTND)}</strong>
           </div>
           <div className="flex justify-between">
             <span>Frais de livraison</span>
             <strong className="text-slate-900">
-              {(order.shippingTND ?? order.shippingCost) === 0
+              {(order.deliveryFee ?? order.shippingTND ?? order.shippingCost) === 0
                 ? t.free
-                : formatPrice(order.shippingTND ?? order.shippingCost)}
+                : formatPrice(order.deliveryFee ?? order.shippingTND ?? order.shippingCost)}
             </strong>
           </div>
           {order.discountAmount ? (
@@ -147,7 +181,7 @@ export const OrderSuccessPage: React.FC = () => {
           ) : null}
           <div className="flex justify-between text-base font-black text-slate-900 pt-2 border-t border-slate-200">
             <span>{t.total} à régler</span>
-            <span className="text-orange-600">{formatPrice(order.totalTND ?? order.totalPrice)}</span>
+            <span className="text-orange-600">{formatPrice(getOrderTotal(order))}</span>
           </div>
         </div>
 
@@ -164,6 +198,18 @@ export const OrderSuccessPage: React.FC = () => {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+          {canSendToWhatsApp && (
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>Envoyer la commande sur WhatsApp</span>
+            </a>
+          )}
+
           <button
             onClick={() => window.print()}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-50 transition"
@@ -173,7 +219,7 @@ export const OrderSuccessPage: React.FC = () => {
           </button>
 
           <button
-            onClick={() => navigateTo('track-order', { orderNumber: order.orderNumber })}
+            onClick={() => navigateTo('track-order', { orderNumber: order.id })}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-md"
           >
             <Package className="w-4 h-4" />

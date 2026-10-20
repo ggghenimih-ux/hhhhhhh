@@ -43,7 +43,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
         </div>
         <div>
           <h3 className="text-base font-bold text-slate-900">
-            {emptyMessage || (language === 'ar' ? 'لا توجد منتجات مطابقة' : 'Aucun produit trouvé')}
+            {emptyMessage || (language === 'ar' ? 'لا توجد منتجات في الكتالوج حالياً' : 'Le catalogue ne contient aucun produit pour le moment.')}
           </h3>
           <p className="text-xs text-slate-500 mt-1">
             {language === 'ar'

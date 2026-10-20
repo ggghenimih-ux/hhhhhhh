@@ -14,7 +14,7 @@ export const TRANSLATIONS = {
     account: "Mon Compte",
     adminDashboard: "Tableau de Bord Admin",
     trackOrder: "Suivre Commande",
-    freeShippingNotice: "Livraison GRATUITE en Tunisie dès 300 DT d'achats !",
+    freeShippingNotice: "Livraison gratuite selon les paramètres de la boutique.",
     currency: "DT",
     
     // Navigation
@@ -33,7 +33,6 @@ export const TRANSLATIONS = {
     discoverCatalog: "Explorer le Catalogue",
     fastDeliveryTn: "Livraison 24/48h sur 24 Gouvernorats",
     genuineParts: "100% Produits Authentiques & Testés",
-    warrantySupport: "Garantie & Support Après-Vente Réactif",
     cashOnDelivery: "Paiement à la Livraison ou Carte Bancaire",
     
     // Filters & Sorting
@@ -63,7 +62,8 @@ export const TRANSLATIONS = {
     reviews: "Avis Clients",
     writeReview: "Donner votre avis",
     relatedProducts: "Produits Similaires Recommandés",
-    warranty: "Garantie",
+    available: "Disponible",
+    outOfStock: "Rupture de stock",
     sku: "Réf / SKU",
     share: "Partager",
     
@@ -77,7 +77,6 @@ export const TRANSLATIONS = {
     total: "Total",
     checkout: "Passer la Commande",
     promoCode: "Code promo / Réduction",
-    applyCoupon: "Appliquer",
     couponApplied: "Code promo appliqué avec succès (-10%)",
     freeShippingRemaining: "Ajoutez encore {amount} DT pour bénéficier de la livraison GRATUITE !",
     freeShippingReached: "Félicitations ! Vous bénéficiez de la livraison GRATUITE !",
@@ -167,7 +166,7 @@ export const TRANSLATIONS = {
     account: "حسابي",
     adminDashboard: "لوحة التحكم",
     trackOrder: "تتبع طلبيتك",
-    freeShippingNotice: "توصيل مجاني لكامل تراب الجمهورية التونسية ابتداءً من 300 د.ت !",
+    freeShippingNotice: "توصيل مجاني حسب إعدادات المتجر.",
     currency: "د.ت",
     
     // Navigation
@@ -185,8 +184,7 @@ export const TRANSLATIONS = {
     shopNow: "اطلب الآن",
     discoverCatalog: "استكشف الكتالوج",
     fastDeliveryTn: "توصيل سريع 24/48 ساعة لكافة الـ 24 ولاية",
-    genuineParts: "منتجات أصلية ومضمونة 100%",
-    warrantySupport: "ضمان حقيقي ودعم فني مابعد البيع",
+    genuineParts: "منتجات أصلية ومختبرة 100%",
     cashOnDelivery: "الدفع عند الاستلام أو بالبطاقة البنكية",
     
     // Filters & Sorting
@@ -216,7 +214,8 @@ export const TRANSLATIONS = {
     reviews: "تقييمات الفنيين والعملاء",
     writeReview: "أضف تقييمك",
     relatedProducts: "منتجات ذات صلة نوصي بها",
-    warranty: "الضمان",
+    available: "متوفر",
+    outOfStock: "نفد من المخزون",
     sku: "رمز المنتج (SKU)",
     share: "مشاركة",
     
@@ -230,7 +229,6 @@ export const TRANSLATIONS = {
     total: "المجموع الكلي",
     checkout: "إتمام الطلب والشراء",
     promoCode: "كود الخصم / القسيمة",
-    applyCoupon: "تطبيق الكود",
     couponApplied: "تم تفعيل كود الخصم بنجاح (-10%)",
     freeShippingRemaining: "أضف منتجات بقيمة {amount} د.ت للحصول على توصيل مجاني !",
     freeShippingReached: "مبروك ! لقد حصلت على شحن وتوصيل مجاني !",
@@ -319,7 +317,7 @@ export const TRANSLATIONS = {
     account: "Account",
     adminDashboard: "Admin Panel",
     trackOrder: "Track Order",
-    freeShippingNotice: "FREE Shipping in Tunisia on orders over 300 TND!",
+    freeShippingNotice: "Free shipping based on store settings.",
     currency: "TND",
     
     home: "Home",
@@ -336,7 +334,6 @@ export const TRANSLATIONS = {
     discoverCatalog: "Explore Catalog",
     fastDeliveryTn: "24/48h Fast Delivery Across 24 Governorates",
     genuineParts: "100% Genuine & Tested Tools",
-    warrantySupport: "Warranty & Reliable After-Sales Support",
     cashOnDelivery: "Cash on Delivery & Secure Online Card",
     
     filters: "Filters",
@@ -364,7 +361,8 @@ export const TRANSLATIONS = {
     reviews: "Customer Reviews",
     writeReview: "Write a Review",
     relatedProducts: "Related Products",
-    warranty: "Warranty",
+    available: "Available",
+    outOfStock: "Out of stock",
     sku: "SKU",
     share: "Share",
     
@@ -377,7 +375,6 @@ export const TRANSLATIONS = {
     total: "Total",
     checkout: "Proceed to Checkout",
     promoCode: "Promo / Coupon Code",
-    applyCoupon: "Apply",
     couponApplied: "Coupon applied successfully (-10%)",
     freeShippingRemaining: "Add {amount} TND more to get FREE Delivery!",
     freeShippingReached: "Congratulations! You qualify for FREE Delivery!",

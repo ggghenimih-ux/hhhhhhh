@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { api } from '../../services/api';
+import { getOrderTotal } from '../../lib/orderTotals';
 import { AdminInvoiceModal } from './AdminInvoiceModal';
 import { AdminOrderArchiveSection } from './AdminOrderArchiveSection';
 import { useDialogAccessibility } from '../../hooks/useDialogAccessibility';
@@ -25,9 +26,19 @@ import {
 
 interface AdminOrdersTabProps {
   onRefreshData?: () => void;
+  ordersSnapshot?: any[];
+  newOrderIds?: string[];
+  focusOrderId?: string | null;
+  onUnreadOrderSeen?: (orderId: string) => void;
 }
 
-export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData }) => {
+export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({
+  onRefreshData,
+  ordersSnapshot = [],
+  newOrderIds = [],
+  focusOrderId = null,
+  onUnreadOrderSeen,
+}) => {
   const { formatPrice, showToast } = useStore();
 
   const [orders, setOrders] = useState<any[]>([]);
@@ -58,7 +69,7 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
   const fetchOrders = async () => {
     try {
       setIsLoading(true);
-      const res = await api.orders.getAdminOrders({ limit: 100 });
+      const res = await api.orders.getAdminOrders({ limit: 50 });
       if (res?.data && Array.isArray(res.data)) {
         setOrders(res.data);
       }
@@ -70,8 +81,29 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
   };
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    setOrders(ordersSnapshot);
+    setIsLoading(false);
+  }, [ordersSnapshot]);
+
+  useEffect(() => {
+    if (!focusOrderId) return;
+    document.getElementById(`admin-order-${focusOrderId}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+  }, [focusOrderId, orders]);
+
+  const handleMarkSeen = async (orderId: string) => {
+    try {
+      const response = await api.orders.markSeen(orderId);
+      const seenAt = response.data?.seenAt ?? new Date().toISOString();
+      setOrders((current) => current.map((order) => order.id === orderId ? { ...order, seenAt } : order));
+      onUnreadOrderSeen?.(orderId);
+      showToast('Commande marquée comme vue.', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Impossible de marquer cette commande comme vue.', 'error');
+    }
+  };
 
   // Update Status handler
   const handleUpdateStatus = async (orderId: string, newStatus: string, newPaymentStatus?: string) => {
@@ -115,6 +147,7 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
       setIsSavingOrder(true);
       const response = await api.orders.update(editingOrder.id, {
         ...orderForm,
+        city: orderForm.delegation.trim() || orderForm.governorate.trim(),
         customerEmail: orderForm.customerEmail.trim() || null,
         delegation: orderForm.delegation.trim() || null,
         notes: orderForm.notes.trim() || null,
@@ -141,7 +174,7 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
       if (!response?.success) throw new Error(response?.message || 'La suppression de la commande a échoué.');
       setOrders((current) => current.filter((item) => item.id !== order.id));
       setOrderToDelete(null);
-      showToast('Commande supprimée définitivement.', 'success');
+      showToast('Commande masquée; son historique est conservé.', 'success');
       onRefreshData?.();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Impossible de supprimer cette commande.', 'error');
@@ -165,11 +198,11 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
   });
 
   // Quick stats
-  const pendingCount = orders.filter((o) => o.status === 'PENDING').length;
-  const deliveredCount = orders.filter((o) => o.status === 'DELIVERED').length;
+  const pendingCount = orders.filter((o) => String(o.status).toUpperCase() === 'PENDING').length;
+  const deliveredCount = orders.filter((o) => String(o.status).toUpperCase() === 'DELIVERED').length;
   const totalRevenue = orders
-    .filter((o) => o.status !== 'CANCELLED')
-    .reduce((sum, o) => sum + (o.totalTND || 0), 0);
+    .filter((o) => String(o.status).toUpperCase() !== 'CANCELLED')
+    .reduce((sum, o) => sum + getOrderTotal(o), 0);
 
   return (
     <div className="space-y-6">
@@ -278,14 +311,20 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
         ) : (
           filteredOrders.map((order) => {
             const cleanPhone = (order.customerPhone || '').replace(/[\s\-\(\)\+]/g, '');
-            const isDelivered = order.status === 'DELIVERED';
-            const isPending = order.status === 'PENDING';
-            const isCancelled = order.status === 'CANCELLED';
+            const normalizedStatus = String(order.status ?? '').toUpperCase();
+            const isDelivered = normalizedStatus === 'DELIVERED';
+            const isPending = normalizedStatus === 'PENDING';
+            const isCancelled = normalizedStatus === 'CANCELLED';
 
             return (
               <div
                 key={order.id}
-                className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4 hover:border-slate-300 transition"
+                id={`admin-order-${order.id}`}
+                className={`bg-white rounded-3xl border p-5 sm:p-6 shadow-xs space-y-4 transition ${
+                  newOrderIds.includes(order.id) || focusOrderId === order.id
+                    ? 'border-orange-400 ring-2 ring-orange-100'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
               >
                 {/* Order Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
@@ -323,6 +362,17 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
                       <Edit2 className="h-3.5 w-3.5" />
                       <span>Modifier</span>
                     </button>
+                    {!order.seenAt && (
+                      <button
+                        type="button"
+                        onClick={() => void handleMarkSeen(order.id)}
+                        aria-label={`Marquer la commande ${order.orderNumber} comme vue`}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span>Marquer comme vue</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setOrderToDelete(order)}
@@ -344,6 +394,7 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
                       Destinataire
                     </span>
                     <strong className="text-sm text-slate-900 block">{order.customerName}</strong>
+                    {order.customerEmail && <span className="block text-slate-500 mt-1">{order.customerEmail}</span>}
                     <div className="flex items-center gap-2 mt-1">
                       <a
                         href={`tel:+216${cleanPhone}`}
@@ -370,7 +421,10 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
                       Lieu de Livraison
                     </span>
                     <span className="font-semibold text-slate-800 block">
-                      {order.governorate} {order.delegation ? `· ${order.delegation}` : ''}
+                      Gouvernorat : {order.governorate || '—'}
+                    </span>
+                    <span className="font-semibold text-slate-800 block">
+                      Ville : {order.city || order.delegation || order.governorate || '—'}
                     </span>
                     <p className="text-slate-500 mt-0.5 leading-relaxed">{order.address}</p>
                     {order.notes && (
@@ -383,9 +437,19 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
                   {/* Order Status & Payment Updates */}
                   <div className="space-y-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
                     <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-700">Mode de paiement :</span>
+                      <span className="text-xs font-semibold text-slate-800">
+                        {order.paymentMethod === 'cod'
+                          ? 'Paiement à la livraison'
+                          : order.paymentMethod === 'bank_transfer'
+                            ? 'Virement bancaire'
+                            : order.paymentMethod || '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-700">Statut de Livraison :</span>
                       <select
-                        value={order.status}
+                        value={normalizedStatus}
                         onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
                         className={`text-xs font-bold py-1 px-2.5 rounded-lg border cursor-pointer ${
                           isDelivered
@@ -431,7 +495,7 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
                           key={i}
                           className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 text-[11px] font-medium"
                         >
-                          {item.quantity}x {item.productName || 'Article GSM'} ({formatPrice(item.priceTND || item.price)})
+                          {item.qty ?? item.quantity}x {item.name || item.productName || 'Article'}{item.variant ? ` (${typeof item.variant === 'string' ? item.variant : item.variant.name})` : ''} · {formatPrice(item.unitPrice ?? item.priceTND ?? item.price)} / unité · {formatPrice(item.lineTotal ?? item.totalTND ?? (item.unitPrice ?? item.priceTND ?? item.price ?? 0) * (item.qty ?? item.quantity ?? 1))}
                         </span>
                       ))}
                     </div>
@@ -439,10 +503,13 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({ onRefreshData })
 
                   <div className="text-end font-mono">
                     <span className="text-[11px] text-slate-400 block">
-                      Livraison: {order.shippingTND === 0 ? 'Gratuite' : formatPrice(order.shippingTND)}
+                      Sous-total: {formatPrice(order.subtotal ?? order.subtotalTND)}
+                    </span>
+                    <span className="text-[11px] text-slate-400 block">
+                      Livraison: {(order.deliveryFee ?? order.shippingTND) === 0 ? 'Gratuite' : formatPrice(order.deliveryFee ?? order.shippingTND)}
                     </span>
                     <strong className="text-sm sm:text-base font-black text-orange-600">
-                      Total: {formatPrice(order.totalTND)}
+                      Total: {formatPrice(getOrderTotal(order))}
                     </strong>
                   </div>
                 </div>

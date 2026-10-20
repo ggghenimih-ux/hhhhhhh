@@ -128,15 +128,6 @@ export const Footer: React.FC = () => {
                   {language === 'ar' ? 'حسابي / تسجيل الدخول' : 'Mon Compte / Connexion'}
                 </button>
               </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => navigateTo('admin-login')}
-                  className="hover:text-orange-400 text-slate-500 transition text-[11px] flex items-center gap-1 pt-1"
-                >
-                  <span>🔒 {language === 'ar' ? 'فضاء الإدارة (Admin)' : 'Espace Administrateur'}</span>
-                </button>
-              </li>
             </ul>
           </div>
 
@@ -146,14 +137,16 @@ export const Footer: React.FC = () => {
               {language === 'ar' ? 'خدمة العملاء والاتصال' : 'Service Client & Commandes'}
             </h4>
             <ul className="space-y-2.5 text-slate-400">
-              <li className="flex items-start gap-2">
-                <Phone className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <a href={`tel:${cleanPhone}`} className="hover:text-white font-mono block font-semibold text-slate-200">
-                    {phone}
-                  </a>
-                </div>
-              </li>
+              {phone && (
+                <li className="flex items-start gap-2">
+                  <Phone className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <a href={`tel:${cleanPhone}`} className="hover:text-white font-mono block font-semibold text-slate-200">
+                      {phone}
+                    </a>
+                  </div>
+                </li>
+              )}
               {whatsapp && (
                 <li className="flex items-center gap-2">
                   <MessageCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
@@ -194,12 +187,12 @@ export const Footer: React.FC = () => {
                 <Truck className="w-4 h-4 text-amber-400 flex-shrink-0" />
                 <div>
                   <span className="block font-medium text-slate-200">
-                    {language === 'ar' ? `توصيل: ${settings?.defaultShippingTND ?? 7} DT` : `Livraison: ${settings?.defaultShippingTND ?? 7} DT`}
+                    {language === 'ar' ? `توصيل: ${settings.defaultShippingTND} DT` : `Livraison: ${settings.defaultShippingTND} DT`}
                   </span>
                   <span className="text-[11px] text-slate-400">
                     {language === 'ar'
-                      ? `مجاني ابتداءً من ${settings?.freeShippingThresholdTND ?? 300} DT`
-                      : `Gratuite dès ${settings?.freeShippingThresholdTND ?? 300} DT d'achats`}
+                      ? `مجاني ابتداءً من ${settings.freeShippingThresholdTND} DT`
+                      : `Gratuite dès ${settings.freeShippingThresholdTND} DT d'achats`}
                   </span>
                 </div>
               </div>

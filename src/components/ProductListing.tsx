@@ -269,7 +269,9 @@ export const ProductListing: React.FC = () => {
                   <Search className="w-6 h-6" />
                 </div>
                 <h3 className="text-sm font-bold text-slate-900">
-                  {t.noProductsFound || 'Aucun produit trouvé'}
+                  {products.length === 0
+                    ? language === 'ar' ? 'لا توجد منتجات في الكتالوج حالياً' : 'Le catalogue ne contient aucun produit pour le moment.'
+                    : t.noProductsFound || 'Aucun produit trouvé'}
                 </h3>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto">
                   {language === 'ar'

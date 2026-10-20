@@ -6,7 +6,6 @@ export interface Specification {
   model?: string;
   dimensions?: string;
   weight?: string;
-  warranty?: string;
   voltage?: string;
   power?: string;
   compatibility?: string;
@@ -22,7 +21,6 @@ export interface Variant {
   name: string;
   value: string;
   priceAdjustment: number;
-  stock?: number;
 }
 
 export interface Review {
@@ -56,9 +54,7 @@ export interface Product {
   subcategory?: string;
   image?: string;
   images: string[];
-  stock: number;
-  lowStockThreshold?: number;
-  warranty?: string;
+  isOutOfStock?: boolean;
   rating: number;
   reviewsCount?: number;
   reviews?: Review[];
@@ -84,6 +80,7 @@ export interface StoreSettings {
   faviconUrl: string;
   phone: string;
   whatsapp: string;
+  whatsappNumber: string;
   email: string;
   address: string;
   facebookUrl: string;
@@ -169,21 +166,26 @@ export interface OrderItem {
   name?: string;
   image?: string;
   sku?: string;
+  unitPrice?: number;
+  qty?: number;
+  lineTotal?: number;
   priceTND?: number;
   price?: number;
   quantity: number;
   totalTND?: number;
+  isOutOfStock?: boolean;
   variant?: Variant;
 }
 
 export interface Order {
   id: string;
-  orderNumber: string; // e.g. "GSM-TN-2024-1082"
+  orderNumber: string;
   userId?: string | null;
   customerName: string;
   customerEmail?: string | null;
   customerPhone: string;
   governorate?: string;
+  city?: string;
   delegation?: string | null;
   address?: string;
   shippingAddress?: {
@@ -202,6 +204,8 @@ export interface Order {
   totalTND?: number;
   // Aliases for compatibility
   subtotal?: number;
+  deliveryFee?: number;
+  grandTotal?: number;
   shippingCost?: number;
   tax?: number;
   discountAmount?: number;
@@ -225,7 +229,7 @@ export interface User {
   lastName?: string;
   email: string;
   phone: string;
-  role?: 'CUSTOMER' | 'ADMIN';
+  role?: 'CUSTOMER' | 'ADMIN' | 'TECHNICIEN';
   isAdmin?: boolean;
   avatar?: string;
   addresses?: any[];
@@ -239,7 +243,6 @@ export interface FilterState {
   brand: string | null;
   minPrice: number;
   maxPrice: number;
-  inStockOnly: boolean;
   discountOnly: boolean;
   searchQuery: string;
   sortBy: 'popularity' | 'price-asc' | 'price-desc' | 'rating' | 'newest';

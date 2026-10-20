@@ -49,7 +49,6 @@ export const AdminDashboardPage: React.FC = () => {
     catalogProducts?: number;
     totalCategories?: number;
     deliveredOrders?: number;
-    lowStockProducts: number;
     recentOrders?: any[];
   }>({
     totalOrders: 0,
@@ -58,12 +57,14 @@ export const AdminDashboardPage: React.FC = () => {
     catalogProducts: 0,
     totalCategories: 0,
     deliveredOrders: 0,
-    lowStockProducts: 0,
     recentOrders: [],
   });
 
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [pendingOrderCount, setPendingOrderCount] = useState(0);
+  const [liveOrders, setLiveOrders] = useState<any[]>([]);
+  const [unreadOrderIds, setUnreadOrderIds] = useState<string[]>([]);
+  const [focusOrderId, setFocusOrderId] = useState<string | null>(null);
 
   // Sync activeTab when currentRoute changes
   useEffect(() => {
@@ -162,7 +163,7 @@ export const AdminDashboardPage: React.FC = () => {
                 Panneau d'Administration CMS
               </h1>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                BDD SQLite Connectée
+                Firebase Firestore connecté
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -173,8 +174,13 @@ export const AdminDashboardPage: React.FC = () => {
 
         <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
           <AdminOrderNotifier
-            onOpenOrder={() => handleTabChange('orders')}
+            onOpenOrder={(orderId) => {
+              setFocusOrderId(orderId);
+              handleTabChange('orders');
+            }}
             onPendingChange={setPendingOrderCount}
+            onOrdersSnapshot={setLiveOrders}
+            onUnreadChange={setUnreadOrderIds}
           />
 
           <button
@@ -275,6 +281,14 @@ export const AdminDashboardPage: React.FC = () => {
               {pendingOrderCount > 99 ? '99+' : pendingOrderCount}
             </span>
           )}
+          {unreadOrderIds.length > 0 && (
+            <span
+              aria-label={`${unreadOrderIds.length} commande(s) non lue(s)`}
+              className="min-w-5 rounded-full bg-orange-500 px-1.5 py-0.5 text-center text-[10px] text-white"
+            >
+              {unreadOrderIds.length > 99 ? '99+' : unreadOrderIds.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -300,6 +314,7 @@ export const AdminDashboardPage: React.FC = () => {
           <ImageIcon className="w-4 h-4" />
           <span>Médiathèque</span>
         </button>
+
       </div>
 
       {/* Render Active Tab Component */}
@@ -327,13 +342,20 @@ export const AdminDashboardPage: React.FC = () => {
           <AdminCategoriesTab onRefreshData={loadStats} />
         )}
 
-        {activeTab === 'orders' && (
-          <AdminOrdersTab onRefreshData={loadStats} />
-        )}
+        <div hidden={activeTab !== 'orders'}>
+          <AdminOrdersTab
+            onRefreshData={loadStats}
+            ordersSnapshot={liveOrders}
+            newOrderIds={unreadOrderIds}
+            focusOrderId={focusOrderId}
+            onUnreadOrderSeen={(id) => setUnreadOrderIds((current) => current.filter((orderId) => orderId !== id))}
+          />
+        </div>
 
         {activeTab === 'users' && <AdminUsersTab />}
 
         {activeTab === 'media' && <AdminMediaTab />}
+
       </div>
     </div>
   );

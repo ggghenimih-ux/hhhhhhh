@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { AdminInvoiceModal } from './AdminInvoiceModal';
+import { getOrderTotal } from '../../lib/orderTotals';
 import {
   TrendingUp,
   ShoppingCart,
@@ -23,7 +24,6 @@ interface AdminOverviewTabProps {
     catalogProducts?: number;
     totalCategories?: number;
     deliveredOrders?: number;
-    lowStockProducts: number;
     recentOrders?: any[];
   };
   onNavigateTab: (tab: 'products' | 'orders' | 'categories' | 'settings' | 'media') => void;
@@ -208,7 +208,7 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
                       {order.governorate}
                     </td>
                     <td className="py-3 px-4 text-end font-mono font-bold text-slate-900">
-                      {formatPrice(order.totalTND)}
+                      {formatPrice(getOrderTotal(order))}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-800">

@@ -249,7 +249,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 890.0,
     originalPrice: 980.0,
     discount: 9,
-    stock: 7,
     images: [
       'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
       'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=800&q=80',
@@ -262,7 +261,6 @@ export const PRODUCTS_DATA: Product[] = [
       temperatureRange: '100°C - 500°C',
       airVolume: '1 - 120 L/min',
       weight: '4.65 Kg',
-      warranty: '12 Mois Garantie Tunisie',
       countryOfOrigin: 'Original Certified'
     },
     rating: 4.95,
@@ -291,7 +289,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 460.0,
     originalPrice: 520.0,
     discount: 12,
-    stock: 12,
     images: [
       'https://images.unsplash.com/photo-1597733336794-12d05021d510?auto=format&fit=crop&w=800&q=80',
       'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
@@ -306,7 +303,6 @@ export const PRODUCTS_DATA: Product[] = [
       power: '200W Peak',
       voltage: '220V',
       temperatureRange: '100°C - 500°C',
-      warranty: '12 Mois Tunisie',
       heatingSpeed: '2 Secondes'
     },
     rating: 4.9,
@@ -335,7 +331,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 1390.0,
     originalPrice: 1550.0,
     discount: 10,
-    stock: 4,
     images: [
       'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80',
       'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=800&q=80',
@@ -351,7 +346,6 @@ export const PRODUCTS_DATA: Product[] = [
       eyepieces: 'WF10X / 20mm',
       workingDistance: '100mm (extensible à 165mm avec lentille 0.5X)',
       camera: 'Option 4K HDMI 48MP',
-      warranty: '12 Mois'
     },
     rating: 5.0,
     reviewsCount: 19,
@@ -379,7 +373,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 380.0,
     originalPrice: 420.0,
     discount: 9,
-    stock: 9,
     images: [
       'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=800&q=80',
     ],
@@ -391,7 +384,6 @@ export const PRODUCTS_DATA: Product[] = [
       displayAccuracy: 'Voltage: 10mV / Current: 1mA',
       protection: 'OCP, OVP, Over-temperature',
       weight: '4.2 Kg',
-      warranty: '12 Mois'
     },
     rating: 4.88,
     reviewsCount: 16,
@@ -418,7 +410,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 95.0,
     originalPrice: 115.0,
     discount: 17,
-    stock: 22,
     images: [
       'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
     ],
@@ -428,7 +419,6 @@ export const PRODUCTS_DATA: Product[] = [
       type: 'Auto-Range Digital Multimeter',
       features: 'Ultra-fast Buzzer, Diode test, Capacitance, Frequency',
       display: '6000 Counts',
-      warranty: '6 Mois'
     },
     rating: 4.85,
     reviewsCount: 42,
@@ -455,7 +445,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 590.0,
     originalPrice: 650.0,
     discount: 9,
-    stock: 6,
     images: [
       'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80',
     ],
@@ -469,7 +458,6 @@ export const PRODUCTS_DATA: Product[] = [
       compatibility: 'iPhone 7 / 8 / X / 11 / 12 / 13 / 14 / 15 Series',
       connectivity: 'USB Type-C + WiFi Direct',
       features: 'TrueTone, Battery, FaceID, Vibration, Receiver FPC',
-      warranty: '12 Mois'
     },
     rating: 4.96,
     reviewsCount: 31,
@@ -497,7 +485,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 340.0,
     originalPrice: 380.0,
     discount: 11,
-    stock: 8,
     images: [
       'https://images.unsplash.com/photo-1598327105666-5b89351aff97?auto=format&fit=crop&w=800&q=80',
     ],
@@ -508,7 +495,6 @@ export const PRODUCTS_DATA: Product[] = [
       power: '400W',
       vacuumPressure: 'Forte aspiration double pompe',
       temperatureRange: '50°C - 130°C',
-      warranty: '12 Mois'
     },
     rating: 4.82,
     reviewsCount: 15,
@@ -534,7 +520,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 35.0,
     originalPrice: 45.0,
     discount: 22,
-    stock: 45,
     images: [
       'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
     ],
@@ -575,7 +560,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 42.0,
     originalPrice: 50.0,
     discount: 16,
-    stock: 35,
     images: [
       'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
     ],
@@ -609,7 +593,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 28.0,
     originalPrice: 35.0,
     discount: 20,
-    stock: 60,
     images: [
       'https://images.unsplash.com/photo-1603555501671-8f96b3fce8b4?auto=format&fit=crop&w=800&q=80',
     ],
@@ -644,7 +627,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 25.0,
     originalPrice: 30.0,
     discount: 16,
-    stock: 80,
     images: [
       'https://images.unsplash.com/photo-1603555501671-8f96b3fce8b4?auto=format&fit=crop&w=800&q=80',
     ],
@@ -679,7 +661,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 32.0,
     originalPrice: 38.0,
     discount: 15,
-    stock: 50,
     images: [
       'https://images.unsplash.com/photo-1597733336794-12d05021d510?auto=format&fit=crop&w=800&q=80',
     ],
@@ -714,7 +695,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 38.0,
     originalPrice: 45.0,
     discount: 15,
-    stock: 28,
     images: [
       'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800&q=80',
     ],
@@ -747,7 +727,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 360.0,
     originalPrice: 410.0,
     discount: 12,
-    stock: 5,
     images: [
       'https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=800&q=80',
     ],
@@ -756,7 +735,6 @@ export const PRODUCTS_DATA: Product[] = [
       model: 'iPhone 13 (6.1 pouces)',
       panelType: 'Super Retina XDR OLED',
       resolution: '2532 x 1170 pixels',
-      warranty: '3 Mois Garantie de Test'
     },
     rating: 4.95,
     reviewsCount: 14,
@@ -783,7 +761,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 65.0,
     originalPrice: 80.0,
     discount: 18,
-    stock: 18,
     images: [
       'https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=800&q=80',
     ],
@@ -792,7 +769,6 @@ export const PRODUCTS_DATA: Product[] = [
       compatibility: 'iPhone 12 et iPhone 12 Pro (6.1")',
       capacity: '2815 mAh (10.78 Wh)',
       cycles: '0 Cycle Neuf',
-      warranty: '6 Mois Garantie Échange'
     },
     rating: 4.84,
     reviewsCount: 27,
@@ -818,7 +794,6 @@ export const PRODUCTS_DATA: Product[] = [
     price: 75.0,
     originalPrice: 95.0,
     discount: 21,
-    stock: 30,
     images: [
       'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80',
     ],
@@ -827,7 +802,6 @@ export const PRODUCTS_DATA: Product[] = [
       power: '65W Max',
       ports: '2x Type-C (PD 3.0) + 1x USB-A (QC 4.0)',
       safety: 'Protection contre surchauffe et surtension',
-      warranty: '12 Mois'
     },
     rating: 4.89,
     reviewsCount: 33,

@@ -1,14 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   useStoreCart,
-  useStoreNotifications,
   useStoreProducts,
   useStoreRouting,
   useStoreSettings,
 } from '../context/StoreSlices';
 import { getSafeImageUrl, handleImageError } from '../utils/image';
 import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
-import { MAX_ORDER_QUANTITY } from '../utils/stock';
 import {
   X,
   ShoppingCart,
@@ -17,8 +15,6 @@ import {
   Plus,
   ArrowRight,
   Truck,
-  CheckCircle2,
-  Tag,
   ShieldCheck
 } from 'lucide-react';
 
@@ -33,16 +29,12 @@ export const CartDrawer: React.FC = () => {
     cartSubtotal,
     freeShippingThreshold,
     shippingFee,
-    couponCode,
-    setCouponCode,
-    discountRate,
+    cartTotal,
     isCartDrawerOpen,
     setIsCartDrawerOpen,
   } = useStoreCart();
   const { navigateTo } = useStoreRouting();
-  const { showToast } = useStoreNotifications();
 
-  const [inputCoupon, setInputCoupon] = useState('');
   const dialogRef = useDialogAccessibility(isCartDrawerOpen, () => setIsCartDrawerOpen(false));
 
   if (!isCartDrawerOpen) return null;
@@ -51,18 +43,7 @@ export const CartDrawer: React.FC = () => {
   const remainingForFreeShipping = Math.max(0, freeShippingThreshold - cartSubtotal);
   const isFreeShipping = cartSubtotal >= freeShippingThreshold;
   const shippingCost = shippingFee;
-  const discountAmount = Math.round(cartSubtotal * discountRate * 1000) / 1000;
-  const finalTotal = Math.max(0, cartSubtotal - discountAmount + shippingCost);
-
-  const handleApplyCoupon = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (inputCoupon.trim().toUpperCase() === 'GSM10') {
-      setCouponCode('GSM10');
-      setInputCoupon('');
-    } else {
-      setCouponCode(inputCoupon);
-    }
-  };
+  const finalTotal = cartTotal;
 
   const handleProceedToCheckout = () => {
     setIsCartDrawerOpen(false);
@@ -209,7 +190,6 @@ export const CartDrawer: React.FC = () => {
                             onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.selectedVariant?.id)}
                             aria-label={`${language === 'ar' ? 'زيادة كمية' : 'Augmenter la quantité de'} ${name}`}
                             className="p-1 hover:bg-white text-slate-600 rounded-r-lg"
-                            disabled={item.quantity >= MAX_ORDER_QUANTITY}
                           >
                             <Plus className="w-3 h-3" />
                           </button>
@@ -237,57 +217,12 @@ export const CartDrawer: React.FC = () => {
           {/* Footer & Checkout Summary */}
           {cart.length > 0 && (
             <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50">
-              {/* Promo code form */}
-              <form onSubmit={handleApplyCoupon} className="flex gap-2 mb-3">
-                <div className="relative flex-1">
-                  <Tag className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
-                  <label htmlFor="cart-coupon-code" className="sr-only">
-                    {language === 'ar' ? 'رمز الخصم' : 'Code promo'}
-                  </label>
-                  <input
-                    id="cart-coupon-code"
-                    type="text"
-                    value={inputCoupon}
-                    onChange={(e) => setInputCoupon(e.target.value)}
-                    placeholder="Code Promo (ex: GSM10)"
-                    className="w-full text-xs pl-8 pr-3 py-2 bg-white rounded-xl border border-slate-200 uppercase outline-none focus:border-orange-500"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition"
-                >
-                  {t.applyCoupon}
-                </button>
-              </form>
-
-              {couponCode && (
-                <div className="flex items-center justify-between text-xs text-emerald-700 bg-emerald-50 p-2 rounded-lg border border-emerald-200 mb-3">
-                  <span className="flex items-center gap-1 font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Code {couponCode} actif (-10%)
-                  </span>
-                  <button
-                    onClick={() => setCouponCode('')}
-                    className="text-xs text-rose-600 hover:underline font-bold"
-                  >
-                    Retirer
-                  </button>
-                </div>
-              )}
-
               {/* Price details */}
               <div className="space-y-1.5 text-xs text-slate-600 mb-4">
                 <div className="flex justify-between">
                   <span>{t.subtotal}</span>
                   <span className="font-semibold text-slate-900">{formatPrice(cartSubtotal)}</span>
                 </div>
-                {discountAmount > 0 && (
-                  <div className="flex justify-between text-emerald-600 font-semibold">
-                    <span>Remise Promo</span>
-                    <span>-{formatPrice(discountAmount)}</span>
-                  </div>
-                )}
                 <div className="flex justify-between">
                   <span>{t.shipping}</span>
                   <span className={`font-semibold ${isFreeShipping ? 'text-emerald-600 font-bold' : 'text-slate-900'}`}>
