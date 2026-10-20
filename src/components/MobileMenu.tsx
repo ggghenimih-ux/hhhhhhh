@@ -192,19 +192,20 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        {/* Admin Navigation Shortcut */}
-        <div className="px-4 py-2 border-t border-slate-100 bg-slate-50/50">
-          <button
-            onClick={() => {
-              onClose();
-              navigateTo(user?.role === 'ADMIN' ? 'admin' : 'admin-login');
-            }}
-            className="w-full flex items-center justify-between text-xs text-slate-600 hover:text-orange-600 font-semibold py-1.5 transition"
-          >
-            <span>{language === 'ar' ? '⚙️ فضاء إدارة المتجر' : '⚙️ Espace Administration'}</span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-          </button>
-        </div>
+        {user?.role === 'ADMIN' && (
+          <div className="px-4 py-2 border-t border-slate-100 bg-slate-50/50">
+            <button
+              onClick={() => {
+                onClose();
+                navigateTo('admin');
+              }}
+              className="w-full flex items-center justify-between text-xs text-slate-600 hover:text-orange-600 font-semibold py-1.5 transition"
+            >
+              <span>{language === 'ar' ? '⚙️ فضاء إدارة المتجر' : '⚙️ Espace Administration'}</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+          </div>
+        )}
 
         {/* Footer Support Hotline */}
         <div className="p-4 bg-slate-50 border-t border-slate-200">
