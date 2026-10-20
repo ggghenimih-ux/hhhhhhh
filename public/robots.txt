@@ -1,7 +1,8 @@
 User-agent: *
 Allow: /
 Disallow: /admin
-Disallow: /profile
-Disallow: /checkout
 Disallow: /cart
-Sitemap: https://goods.tn/sitemap.xml
+Disallow: /checkout
+Disallow: /login
+
+Sitemap: https://www.outilsreparationgsm.tn/sitemap.xml
