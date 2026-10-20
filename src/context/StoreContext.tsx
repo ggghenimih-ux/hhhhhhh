@@ -92,6 +92,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     loading: isLoadingUser,
     logout: authLogout,
   } = useAuth();
+  const isAdminPath = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
+  const canLoadStoreData = !isAdminPath || (!isLoadingUser && user?.role === 'ADMIN');
 
   // 1. Language & Currency
   const [language, setLanguageState] = useState<Language>(() => {
@@ -133,8 +135,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   useEffect(() => {
+    if (!canLoadStoreData) return;
     fetchSettings();
-  }, [fetchSettings]);
+  }, [canLoadStoreData, fetchSettings]);
 
   useEffect(() => {
     if (settings.faviconUrl) {
@@ -337,15 +340,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   useEffect(() => {
+    if (!canLoadStoreData) return;
     fetchCategories();
-  }, []);
+  }, [canLoadStoreData]);
 
   useEffect(() => {
+    if (!canLoadStoreData) return;
     const timeout = window.setTimeout(() => {
       void fetchProducts(productPage, filters);
     }, 200);
     return () => window.clearTimeout(timeout);
-  }, [filters, productPage, user?.role]);
+  }, [canLoadStoreData, filters, productPage, user?.role]);
 
   const logout = async () => {
     await authLogout();
@@ -368,6 +373,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [cart]);
 
   useEffect(() => {
+    if (!canLoadStoreData) return;
     const refreshSavedCart = async () => {
       const savedCart = cart;
       if (savedCart.length === 0) return;
@@ -392,7 +398,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     refreshSavedCart();
-  }, []);
+  }, [canLoadStoreData]);
 
   // 7. Wishlist Management
   const [wishlist, setWishlist] = useState<string[]>(() => {

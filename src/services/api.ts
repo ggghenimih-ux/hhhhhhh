@@ -103,10 +103,26 @@ const dateIsInRange = (value: unknown, fromDate: string, toDate: string) => {
 
 export const api = {
   products: {
+    getHomeData: async (): Promise<ApiResponse<{ products: DocumentData[]; categoryCounts: Record<string, number> }>> => {
+      const products = (await getCollection('products'))
+        .filter((product) => product.isActive !== false && !product.deletedAt)
+        .sort((a, b) => {
+          const aDate = Date.parse(String(a.createdAt ?? '')) || 0;
+          const bDate = Date.parse(String(b.createdAt ?? '')) || 0;
+          return bDate - aDate;
+        });
+      const categoryCounts: Record<string, number> = {};
+      products.forEach((product) => {
+        if (typeof product.category === 'string') {
+          categoryCounts[product.category] = (categoryCounts[product.category] ?? 0) + 1;
+        }
+      });
+      return { success: true, data: { products: products.slice(0, 8), categoryCounts } };
+    },
     getAll: async (params: Record<string, any> = {}): Promise<ApiResponse<any[]>> => {
       let products = await getCollection('products');
       const isAdmin = params.admin === 'true';
-      if (!isAdmin) products = products.filter((product) => product.isActive !== false);
+      if (!isAdmin) products = products.filter((product) => product.isActive !== false && !product.deletedAt);
       if (params.category) products = products.filter((product) => product.category === params.category);
       if (params.minPrice !== undefined) {
         products = products.filter((product) => Number(product.priceTND ?? product.price) >= Number(params.minPrice));
@@ -287,6 +303,20 @@ export const api = {
         success: true,
         data: order ? documentData(order.id, order.data()) : null,
       };
+    },
+    getMyOrders: async (): Promise<ApiResponse<any[]>> => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error('Connectez-vous pour consulter vos commandes.');
+      const snapshot = await getDocs(query(
+        collection(db, 'orders'),
+        where('userId', '==', currentUser.uid),
+        limit(50),
+      ));
+      const orders = snapshot.docs
+        .map((item) => documentData(item.id, item.data()))
+        .filter((order) => !order.deletedAt && !order.archivedAt)
+        .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
+      return { success: true, data: orders };
     },
     getAdminOrders: async (params: Record<string, any> = {}) => {
       const orders = (await getOrders())

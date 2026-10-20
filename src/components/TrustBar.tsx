@@ -1,59 +1,78 @@
 import React from 'react';
-import { useStore } from '../context/StoreContext';
-import { Truck, CheckCircle2, ShieldCheck, Headphones } from 'lucide-react';
+import { Banknote, CheckCircle2, MessageCircle, Truck } from 'lucide-react';
+import { useStoreSettings } from '../context/StoreSlices';
+import { whatsappLink } from '../lib/whatsapp';
 
 export const TrustBar: React.FC = () => {
-  const { language } = useStore();
-
-  const trustItems = [
+  const { language, settings, formatPrice } = useStoreSettings();
+  const whatsappNumber = settings.whatsappNumber || settings.whatsapp || settings.phone;
+  const whatsappUrl = whatsappNumber ? whatsappLink(whatsappNumber) : '';
+  const items = [
     {
       icon: Truck,
-      title: language === 'ar' ? 'توصيل داخل تونس' : 'Livraison Tunisie 24/48h',
-      desc: language === 'ar' ? 'شحن سريع لكافة الـ 24 ولاية' : 'Sur tous les gouvernorats',
+      title: language === 'ar' ? 'توصيل خلال 24/48 ساعة' : language === 'en' ? 'Delivery in 24/48h' : 'Livraison 24/48h',
+      description: language === 'ar'
+        ? `مصاريف الشحن ${formatPrice(settings.defaultShippingTND)}`
+        : language === 'en'
+          ? `Shipping fee: ${formatPrice(settings.defaultShippingTND)}`
+          : `Frais : ${formatPrice(settings.defaultShippingTND)}`,
+    },
+    {
+      icon: Banknote,
+      title: language === 'ar' ? 'الدفع عند الاستلام' : language === 'en' ? 'Cash on delivery' : 'Paiement à la livraison',
+      description: language === 'ar' ? 'ادفع عند استلام طلبك' : language === 'en' ? 'Pay when your order arrives' : 'Réglez à la réception',
     },
     {
       icon: CheckCircle2,
-      title: language === 'ar' ? 'دفع عند الاستلام' : 'Paiement à la Livraison',
-      desc: language === 'ar' ? 'ادفع بعد معاينة وفحص الطرد' : 'Réglez en espèces au livreur',
+      title: language === 'ar' ? 'منتجات مختبرة' : language === 'en' ? 'Tested products' : 'Produits testés',
+      description: language === 'ar' ? 'مختارة لورشتك' : language === 'en' ? 'Selected for your workshop' : 'Sélectionnés pour votre atelier',
     },
     {
-      icon: ShieldCheck,
-      title: language === 'ar' ? 'منتجات أصلية 100%' : 'Matériel Testé & Certifié',
-      desc: language === 'ar' ? 'معدات صيانة مختبرة' : 'Outils professionnels testés',
-    },
-    {
-      icon: Headphones,
-      title: language === 'ar' ? 'دعم فني واستشارة' : 'Support Technique GSM',
-      desc: language === 'ar' ? 'مساعدة الفنيين وأصحاب الورشات' : 'Conseils et assistance d’experts',
+      icon: MessageCircle,
+      title: language === 'ar' ? 'اطلب عبر WhatsApp' : language === 'en' ? 'Order on WhatsApp' : 'Commande WhatsApp',
+      description: language === 'ar' ? 'فريقنا يجيب عن أسئلتك' : language === 'en' ? 'Ask us before you order' : 'Un conseil avant de commander',
     },
   ];
 
   return (
-    <section className="bg-slate-50 border-y border-slate-200 py-6 sm:py-8 my-8">
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-4">
-          {trustItems.map((item, idx) => {
-            const Icon = item.icon;
-            return (
-              <div
-                key={idx}
-                className="flex items-center gap-3.5 bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs"
-              >
-                <div className="w-10 h-10 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center flex-shrink-0">
-                  <Icon className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight truncate">
-                    {item.title}
-                  </h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-                    {item.desc}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+    <section
+      className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8"
+      aria-label={language === 'ar' ? 'مميزات المتجر' : language === 'en' ? 'Store benefits' : 'Avantages de la boutique'}
+    >
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {items.map((item, index) => {
+          const Icon = item.icon;
+          const content = (
+            <>
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0F1B2D] text-white">
+                <Icon className={`h-5 w-5 ${index === 3 ? 'text-[#1FA855]' : 'text-orange-300'}`} />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-xs font-extrabold text-[#0F1B2D] sm:text-sm">{item.title}</span>
+                <span className="mt-1 block truncate text-[10px] text-[#5B6B82] sm:text-xs">{item.description}</span>
+              </span>
+            </>
+          );
+
+          return index === 3 && whatsappUrl ? (
+            <a
+              key={item.title}
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex min-w-0 items-center gap-3 rounded-2xl border border-[#E3E8F0] bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:p-4"
+            >
+              {content}
+            </a>
+          ) : (
+            <div
+              key={item.title}
+              className="flex min-w-0 items-center gap-3 rounded-2xl border border-[#E3E8F0] bg-white p-3 shadow-sm sm:p-4"
+            >
+              {content}
+            </div>
+          );
+        })}
       </div>
     </section>
   );

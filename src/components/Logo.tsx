@@ -53,7 +53,7 @@ export const Logo: React.FC<LogoProps> = ({
 
       <div className="flex flex-col text-start">
         <div className="flex items-center gap-1.5">
-          <span className="font-extrabold text-slate-900 tracking-tight text-base sm:text-lg group-hover:text-orange-600 transition-colors leading-tight">
+          <span className="max-w-[clamp(100px,32vw,220px)] truncate font-extrabold text-slate-900 tracking-tight text-sm sm:text-base lg:text-lg group-hover:text-orange-600 transition-colors leading-tight">
             {brandName}
           </span>
           <span className="hidden sm:inline-block px-1.5 py-0.2 text-[10px] font-bold text-orange-700 bg-orange-50 border border-orange-200/70 rounded">
