@@ -44,6 +44,7 @@ export const ProductQuickView: React.FC = () => {
   const isFavorited = isInWishlist(product.id);
   const basePrice = getProductPrice(product);
   const currentPrice = basePrice + (selectedVariant?.priceAdjustment || 0);
+  const isOutOfStock = product.isOutOfStock === true;
 
   const handleAddToCart = () => {
     addToCart(product, quantity, selectedVariant);
@@ -115,6 +116,9 @@ export const ProductQuickView: React.FC = () => {
             <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-snug mb-2">
               {name}
             </h2>
+            <p className={`mb-3 text-xs font-bold ${isOutOfStock ? 'text-rose-700' : 'text-emerald-700'}`}>
+              {isOutOfStock ? t.outOfStock : t.available}
+            </p>
 
             {/* Rating */}
             <div className="flex items-center gap-2 mb-3">
@@ -200,7 +204,8 @@ export const ProductQuickView: React.FC = () => {
               {/* Add to Cart */}
               <button
                 onClick={handleAddToCart}
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white shadow-md transition"
+                disabled={isOutOfStock}
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white shadow-md transition disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 <ShoppingCart className="w-4 h-4" />
                 <span>{t.addToCart}</span>

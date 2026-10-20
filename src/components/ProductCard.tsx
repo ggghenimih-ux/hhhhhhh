@@ -26,6 +26,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const price = getProductPrice(product);
   const originalPrice = product.compareAtPriceTND || product.originalPrice;
   const image = getSafeImageUrl(product.images?.[0] || product.image);
+  const isOutOfStock = product.isOutOfStock === true;
 
   const handleCardClick = () => {
     navigateTo('product-detail', { productSlug: product.slug, productId: product.id });
@@ -62,6 +63,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
         {/* 2. Optional clean single badge (Discount or New) - max 1 badge */}
         <div className="absolute top-2.5 start-2.5 flex flex-col gap-1 pointer-events-none">
+          <span className={`px-2 py-0.5 text-[11px] font-bold rounded ${isOutOfStock ? 'bg-rose-600 text-white' : 'bg-emerald-100 text-emerald-800'}`}>
+            {isOutOfStock ? t.outOfStock : t.available}
+          </span>
           {product.discount && product.discount > 0 ? (
             <span className="px-2 py-0.5 text-[11px] font-bold bg-rose-600 text-white rounded">
               -{product.discount}%
@@ -131,7 +135,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         <button
           type="button"
           onClick={handleAddToCart}
-          className="w-full min-h-[44px] flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white shadow-xs"
+          disabled={isOutOfStock}
+          className="w-full min-h-[44px] flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white shadow-xs disabled:cursor-not-allowed disabled:bg-slate-300"
           aria-label={`Ajouter ${name} au panier`}
         >
           <ShoppingCart className="w-4 h-4 flex-shrink-0" />

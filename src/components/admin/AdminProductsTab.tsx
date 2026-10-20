@@ -52,6 +52,7 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
 
   // Deletion & Confirmation Modal State
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [updatingOutOfStockId, setUpdatingOutOfStockId] = useState<string | null>(null);
   const [productToDelete, setProductToDelete] = useState<any | null>(null);
   const deleteDialogRef = useDialogAccessibility(Boolean(productToDelete), () => setProductToDelete(null));
 
@@ -68,7 +69,6 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
   const [formComparePrice, setFormComparePrice] = useState<number>(0);
   const [formSku, setFormSku] = useState('');
   const [formBrand, setFormBrand] = useState('Mechanic');
-  const [formWarranty, setFormWarranty] = useState('6 Mois');
   const [formShortDesc, setFormShortDesc] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formIsFeatured, setFormIsFeatured] = useState(false);
@@ -147,7 +147,6 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
     setFormComparePrice(0);
     setFormSku(`GSM-${Math.floor(1000 + Math.random() * 9000)}`);
     setFormBrand('Mechanic');
-    setFormWarranty('6 Mois');
     setFormShortDesc('');
     setFormDesc('');
     setFormIsFeatured(false);
@@ -167,7 +166,6 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
     setFormComparePrice(prod.compareAtPriceTND || prod.compareAtPrice || 0);
     setFormSku(prod.sku || '');
     setFormBrand(prod.brand || prod.specs?.brand || 'Mechanic');
-    setFormWarranty(prod.warranty || '6 Mois');
     setFormShortDesc(prod.shortDescription || '');
     setFormDesc(prod.description || '');
     setFormIsFeatured(Boolean(prod.isFeatured));
@@ -233,7 +231,6 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
         compareAtPriceTND: Number(formComparePrice) > 0 ? Number(formComparePrice) : null,
         sku: formSku.trim(),
         brand: formBrand.trim(),
-        warranty: formWarranty.trim(),
         shortDescription: formShortDesc.trim(),
         description: formDesc.trim() || 'Équipement professionnel de réparation GSM.',
         image: fallbackImg,
@@ -281,6 +278,29 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
       if (onRefreshData) onRefreshData();
     } catch (err: any) {
       showToast(err.message || 'حدث خطأ أثناء تعديل حالة المنتج.', 'error');
+    }
+  };
+
+  const handleToggleOutOfStock = async (id: string, currentStatus: boolean) => {
+    try {
+      setUpdatingOutOfStockId(id);
+      const nextStatus = !currentStatus;
+      await api.products.updateOutOfStock(id, nextStatus);
+      setProducts((prev) =>
+        prev.map((product) => (product.id === id ? { ...product, isOutOfStock: nextStatus } : product)),
+      );
+      showToast(
+        nextStatus ? 'Le produit est marqué en rupture de stock.' : 'Le produit est disponible.',
+        'success',
+      );
+      refreshProducts();
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Impossible de modifier la disponibilité du produit.',
+        'error',
+      );
+    } finally {
+      setUpdatingOutOfStockId(null);
     }
   };
 
@@ -521,6 +541,7 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
                   <th className="py-3.5 px-4 text-start">Catégorie</th>
                   <th className="py-3.5 px-4 text-start">Prix (DT)</th>
                   <th className="py-3.5 px-4 text-center">Statut</th>
+                  <th className="py-3.5 px-4 text-center">Disponibilité</th>
                   <th className="py-3.5 px-4 text-end">Actions</th>
                 </tr>
               </thead>
@@ -607,6 +628,24 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
                               <span>Masqué (مخفي)</span>
                             </>
                           )}
+                        </button>
+                      </td>
+
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleOutOfStock(prod.id, prod.isOutOfStock === true)}
+                          disabled={updatingOutOfStockId === prod.id}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold transition disabled:cursor-wait disabled:opacity-60 ${
+                            prod.isOutOfStock === true
+                              ? 'bg-rose-100 text-rose-800 hover:bg-rose-200'
+                              : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                          }`}
+                          title={prod.isOutOfStock === true ? 'Cliquer pour rendre disponible' : 'Cliquer pour marquer en rupture de stock'}
+                          aria-label={`${prod.isOutOfStock === true ? 'Rendre disponible' : 'Marquer en rupture de stock'} : ${prod.name}`}
+                        >
+                          {updatingOutOfStockId === prod.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                          <span>{prod.isOutOfStock === true ? 'Rupture de stock' : 'Disponible'}</span>
                         </button>
                       </td>
 
@@ -743,7 +782,7 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="product-category" className="font-bold text-slate-700 block mb-1">Catégorie *</label>
                   <select
@@ -773,17 +812,6 @@ export const AdminProductsTab: React.FC<AdminProductsTabProps> = ({
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="product-warranty" className="font-bold text-slate-700 block mb-1">Garantie</label>
-                  <input
-                    id="product-warranty"
-                    type="text"
-                    value={formWarranty}
-                    onChange={(e) => setFormWarranty(e.target.value)}
-                    placeholder="6 Mois, 1 An..."
-                    className="w-full p-2.5 rounded-xl border border-slate-300"
-                  />
-                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">

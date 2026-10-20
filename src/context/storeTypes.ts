@@ -93,9 +93,6 @@ export interface StoreContextType {
   shippingFee: number;
   freeShippingThreshold: number;
   cartTotal: number;
-  couponCode: string;
-  setCouponCode: (code: string) => void;
-  discountRate: number;
   wishlist: string[];
   toggleWishlist: (productId: string) => void;
   isInWishlist: (productId: string) => boolean;

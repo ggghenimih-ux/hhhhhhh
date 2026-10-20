@@ -261,7 +261,6 @@ export const PRODUCTS_DATA: Product[] = [
       temperatureRange: '100°C - 500°C',
       airVolume: '1 - 120 L/min',
       weight: '4.65 Kg',
-      warranty: '12 Mois Garantie Tunisie',
       countryOfOrigin: 'Original Certified'
     },
     rating: 4.95,
@@ -304,7 +303,6 @@ export const PRODUCTS_DATA: Product[] = [
       power: '200W Peak',
       voltage: '220V',
       temperatureRange: '100°C - 500°C',
-      warranty: '12 Mois Tunisie',
       heatingSpeed: '2 Secondes'
     },
     rating: 4.9,
@@ -348,7 +346,6 @@ export const PRODUCTS_DATA: Product[] = [
       eyepieces: 'WF10X / 20mm',
       workingDistance: '100mm (extensible à 165mm avec lentille 0.5X)',
       camera: 'Option 4K HDMI 48MP',
-      warranty: '12 Mois'
     },
     rating: 5.0,
     reviewsCount: 19,
@@ -387,7 +384,6 @@ export const PRODUCTS_DATA: Product[] = [
       displayAccuracy: 'Voltage: 10mV / Current: 1mA',
       protection: 'OCP, OVP, Over-temperature',
       weight: '4.2 Kg',
-      warranty: '12 Mois'
     },
     rating: 4.88,
     reviewsCount: 16,
@@ -423,7 +419,6 @@ export const PRODUCTS_DATA: Product[] = [
       type: 'Auto-Range Digital Multimeter',
       features: 'Ultra-fast Buzzer, Diode test, Capacitance, Frequency',
       display: '6000 Counts',
-      warranty: '6 Mois'
     },
     rating: 4.85,
     reviewsCount: 42,
@@ -463,7 +458,6 @@ export const PRODUCTS_DATA: Product[] = [
       compatibility: 'iPhone 7 / 8 / X / 11 / 12 / 13 / 14 / 15 Series',
       connectivity: 'USB Type-C + WiFi Direct',
       features: 'TrueTone, Battery, FaceID, Vibration, Receiver FPC',
-      warranty: '12 Mois'
     },
     rating: 4.96,
     reviewsCount: 31,
@@ -501,7 +495,6 @@ export const PRODUCTS_DATA: Product[] = [
       power: '400W',
       vacuumPressure: 'Forte aspiration double pompe',
       temperatureRange: '50°C - 130°C',
-      warranty: '12 Mois'
     },
     rating: 4.82,
     reviewsCount: 15,
@@ -742,7 +735,6 @@ export const PRODUCTS_DATA: Product[] = [
       model: 'iPhone 13 (6.1 pouces)',
       panelType: 'Super Retina XDR OLED',
       resolution: '2532 x 1170 pixels',
-      warranty: '3 Mois Garantie de Test'
     },
     rating: 4.95,
     reviewsCount: 14,
@@ -777,7 +769,6 @@ export const PRODUCTS_DATA: Product[] = [
       compatibility: 'iPhone 12 et iPhone 12 Pro (6.1")',
       capacity: '2815 mAh (10.78 Wh)',
       cycles: '0 Cycle Neuf',
-      warranty: '6 Mois Garantie Échange'
     },
     rating: 4.84,
     reviewsCount: 27,
@@ -811,7 +802,6 @@ export const PRODUCTS_DATA: Product[] = [
       power: '65W Max',
       ports: '2x Type-C (PD 3.0) + 1x USB-A (QC 4.0)',
       safety: 'Protection contre surchauffe et surtension',
-      warranty: '12 Mois'
     },
     rating: 4.89,
     reviewsCount: 33,

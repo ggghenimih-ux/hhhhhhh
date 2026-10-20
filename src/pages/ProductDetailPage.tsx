@@ -9,9 +9,7 @@ import {
   Star,
   ShoppingCart,
   Heart,
-  ShieldCheck,
   Truck,
-  RotateCcw,
   Phone,
   Minus,
   Plus,
@@ -78,7 +76,9 @@ export const ProductDetailPage: React.FC = () => {
         '@type': 'Offer',
         priceCurrency: 'TND',
         price: getProductPrice(product),
-        availability: 'https://schema.org/InStock',
+        availability: product.isOutOfStock === true
+          ? 'https://schema.org/OutOfStock'
+          : 'https://schema.org/InStock',
         url: window.location.href,
       },
     });
@@ -147,6 +147,7 @@ export const ProductDetailPage: React.FC = () => {
   const price = getProductPrice(product);
   const comparePrice = product.compareAtPriceTND || product.originalPrice;
   const isFavorited = isInWishlist(product.id);
+  const isOutOfStock = product.isOutOfStock === true;
   const imagesList = Array.isArray(product.images) && product.images.length > 0
     ? product.images
     : [product.image];
@@ -262,19 +263,10 @@ export const ProductDetailPage: React.FC = () => {
             </div>
           )}
 
-          {/* Guarantees Box */}
-          <div className="mt-5 p-4 bg-slate-50 rounded-2xl border border-slate-200 grid grid-cols-2 gap-3 text-xs text-slate-700">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-              <span>Garantie Matériel 12 Mois</span>
-            </div>
+          <div className="mt-5 p-4 bg-slate-50 rounded-2xl border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-700">
             <div className="flex items-center gap-2">
               <Truck className="w-4 h-4 text-orange-500 flex-shrink-0" />
               <span>Livraison 24/48h Tunisie</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <RotateCcw className="w-4 h-4 text-blue-600 flex-shrink-0" />
-              <span>Échange en cas de défaut</span>
             </div>
             <div className="flex items-center gap-2">
               <Phone className="w-4 h-4 text-amber-600 flex-shrink-0" />
@@ -343,6 +335,9 @@ export const ProductDetailPage: React.FC = () => {
             <p className="text-xs text-slate-600 leading-relaxed mb-5">
               {description}
             </p>
+            <p className={`mb-5 text-sm font-bold ${isOutOfStock ? 'text-rose-700' : 'text-emerald-700'}`}>
+              {isOutOfStock ? t.outOfStock : t.available}
+            </p>
 
           </div>
 
@@ -374,7 +369,8 @@ export const ProductDetailPage: React.FC = () => {
               {/* Add to cart */}
               <button
                 onClick={handleAddToCart}
-                className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl text-xs sm:text-sm font-bold bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-600/30 transition"
+                disabled={isOutOfStock}
+                className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl text-xs sm:text-sm font-bold bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-600/30 transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
               >
                 <ShoppingCart className="w-4 h-4" />
                 <span>{t.addToCart}</span>
@@ -488,9 +484,9 @@ export const ProductDetailPage: React.FC = () => {
         {activeTab === 'desc' && (
           <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-slate-700 text-sm leading-relaxed space-y-4">
             <p>{description}</p>
-            <h4 className="font-bold text-slate-900 text-sm">Garantie & Support Réparation GSM :</h4>
+            <h4 className="font-bold text-slate-900 text-sm">Assistance Technique Réparation GSM :</h4>
             <ul className="list-disc pl-5 space-y-1.5 text-xs text-slate-600">
-              <li>Testé et calibré avant expédition pour garantir un fonctionnement optimal.</li>
+              <li>Testé et calibré avant expédition pour un fonctionnement optimal.</li>
               <li>Pièces de rechange et accessoires sélectionnés par Outils Réparation GSM Tunisie.</li>
               <li>Support technique assuré par des techniciens expérimentés au {settings.phone}.</li>
             </ul>

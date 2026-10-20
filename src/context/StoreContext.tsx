@@ -14,6 +14,7 @@ import {
 } from '../types';
 import { TRANSLATIONS } from '../translations';
 import { api } from '../services/api';
+import { auth } from '../services/firebase';
 import { useAuth } from './AuthContext';
 import { StoreSlicesProvider } from './StoreSlices';
 import { DEFAULT_STORE_SETTINGS, initialFilters } from './storeDefaults';
@@ -23,6 +24,13 @@ import { useLocation, useNavigate } from 'react-router-dom';
 export type { AppRoute, RouteParams, StoreContextType, ToastMessage } from './storeTypes';
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
+const ORDER_NUMBER_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+
+const createOrderNumber = () => {
+  const randomValues = crypto.getRandomValues(new Uint8Array(6));
+  const code = Array.from(randomValues, (value) => ORDER_NUMBER_ALPHABET[value % ORDER_NUMBER_ALPHABET.length]).join('');
+  return `ORD-${code}`;
+};
 
 const decodeSegment = (value: string) => {
   try {
@@ -444,24 +452,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
   };
 
-  // 10. Coupon Management
-  const [couponCode, setCouponCodeState] = useState('');
-  const [discountRate, setDiscountRate] = useState(0);
-
-  const setCouponCode = (code: string) => {
-    const trimmed = code.trim().toUpperCase();
-    setCouponCodeState(trimmed);
-    if (trimmed === 'GSM10') {
-      setDiscountRate(0.1);
-      showToast(language === 'ar' ? 'تم تفعيل كود الخصم 10% بنجاح!' : 'Code promo 10% activé avec succès !', 'success');
-    } else if (trimmed === '') {
-      setDiscountRate(0);
-    } else {
-      setDiscountRate(0);
-      showToast(language === 'ar' ? 'كود الخصم غير صالح' : 'Code promo invalide', 'error');
-    }
-  };
-
   // 12. Toast Notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -512,6 +502,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Cart operations
   const addToCart = (product: Product, quantity = 1, variant?: Variant) => {
+    if (product.isOutOfStock === true) {
+      showToast(
+        language === 'ar' ? 'هذا المنتج غير متوفر حالياً.' : 'Ce produit est actuellement en rupture de stock.',
+        'error',
+      );
+      return;
+    }
+
     setCart((prev) => {
       const existingIndex = prev.findIndex(
         (item) => item.product.id === product.id && item.selectedVariant?.id === variant?.id
@@ -554,6 +552,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCart((prev) =>
       prev.map((item) => {
         if (item.product.id === productId && item.selectedVariant?.id === variantId) {
+          if (quantity > item.quantity && item.product.isOutOfStock === true) return item;
           return { ...item, quantity };
         }
         return item;
@@ -575,10 +574,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   ) / 1000;
 
   // Dynamically driven by StoreSettings from database!
-  const freeShippingThreshold = settings?.freeShippingThresholdTND ?? 300.0;
-  const defaultShipping = settings?.defaultShippingTND ?? 7.0;
+  const freeShippingThreshold = settings.freeShippingThresholdTND;
+  const defaultShipping = settings.defaultShippingTND;
   const shippingFee = cartSubtotal >= freeShippingThreshold || cart.length === 0 ? 0 : defaultShipping;
-  const cartTotal = Math.round((cartSubtotal * (1 - discountRate) + shippingFee) * 1000) / 1000;
+  const cartTotal = Math.round((cartSubtotal + shippingFee) * 1000) / 1000;
 
   // Wishlist
   const toggleWishlist = (productId: string) => {
@@ -638,26 +637,63 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Direct Client-Side Order Creation to Firestore (Bypassing Cloud Functions & CORS issues)
   const createOrder = async (orderData: any): Promise<Order> => {
     try {
+      const customerName = String(orderData.customerName ?? '').trim();
+      const customerPhone = String(orderData.customerPhone ?? '').trim();
+      const customerEmail = String(orderData.customerEmail ?? '').trim();
+      const governorate = String(orderData.governorate ?? '').trim();
+      const city = String(orderData.city ?? orderData.delegation ?? governorate).trim();
+      const delegation = String(orderData.delegation ?? '').trim();
+      const address = String(orderData.address ?? '').trim();
+      const notes = String(orderData.notes ?? '').trim();
+
+      if (!customerName || customerName.length > 120) throw new Error('Le nom est obligatoire (120 caractères maximum).');
+      if (!/^[24579]\d{7}$/.test(customerPhone)) throw new Error('Numéro de téléphone tunisien invalide.');
+      if (customerEmail.length > 254) throw new Error('Adresse e-mail trop longue.');
+      if (!governorate || governorate.length > 100) throw new Error('Le gouvernorat est obligatoire.');
+      if (!city || city.length > 120) throw new Error('La ville est obligatoire (120 caractères maximum).');
+      if (delegation.length > 120) throw new Error('La délégation ne peut pas dépasser 120 caractères.');
+      if (!address || address.length > 500) throw new Error('L’adresse est obligatoire (500 caractères maximum).');
+      if (notes.length > 1000) throw new Error('Les instructions ne peuvent pas dépasser 1000 caractères.');
+      if (cart.length === 0) throw new Error('Votre panier est vide.');
+      if (cart.some((item) => item.product.isOutOfStock === true)) {
+        throw new Error('Retirez les produits en rupture de stock du panier avant de confirmer la commande.');
+      }
+
+      const items = cart.map((item) => {
+        const unitPrice = getProductPrice(item.product) + (item.selectedVariant?.priceAdjustment || 0);
+        const lineTotal = Math.round(unitPrice * item.quantity * 1000) / 1000;
+        if (!Number.isFinite(unitPrice) || unitPrice < 0 || !Number.isInteger(item.quantity) || item.quantity < 1) {
+          throw new Error('Un article du panier contient un prix ou une quantité invalide.');
+        }
+        return {
+          productId: item.product.id,
+          name: getLocalizedName(item.product),
+          unitPrice,
+          qty: item.quantity,
+          lineTotal,
+          price: unitPrice,
+          quantity: item.quantity,
+          isOutOfStock: item.product.isOutOfStock === true,
+          variant: item.selectedVariant ? item.selectedVariant.name : null,
+        };
+      });
+
       const payload = {
-        customerName: orderData.customerName,
-        customerPhone: orderData.customerPhone,
-        customerEmail: orderData.customerEmail ?? null,
-        governorate: orderData.governorate,
-        delegation: orderData.delegation ?? null,
-        address: orderData.address,
-        notes: orderData.notes ?? null,
-        couponCode: couponCode || null,
+        orderNumber: createOrderNumber(),
+        userId: auth.currentUser?.uid ?? null,
+        customerName,
+        customerPhone,
+        customerEmail: customerEmail || null,
+        governorate,
+        city,
+        delegation: delegation || null,
+        address,
+        notes: notes || null,
         paymentMethod: orderData.paymentMethod || 'cod',
-        items: cart.map((i) => ({
-          productId: i.product.id,
-          name: getLocalizedName(i.product),
-          price: getProductPrice(i.product) + (i.selectedVariant?.priceAdjustment || 0),
-          quantity: i.quantity,
-          variant: i.selectedVariant ? i.selectedVariant.name : null,
-        })),
-        cartSubtotal,
-        shippingFee,
-        cartTotal,
+        items,
+        subtotal: cartSubtotal,
+        deliveryFee: shippingFee,
+        grandTotal: cartTotal,
         status: 'pending',
         orderStatus: 'pending',
         createdAt: new Date().toISOString(),
@@ -727,9 +763,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         shippingFee,
         freeShippingThreshold,
         cartTotal,
-        couponCode,
-        setCouponCode,
-        discountRate,
         wishlist,
         toggleWishlist,
         isInWishlist,

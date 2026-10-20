@@ -19,7 +19,7 @@ export const TrustBar: React.FC = () => {
     {
       icon: ShieldCheck,
       title: language === 'ar' ? 'منتجات أصلية 100%' : 'Matériel Testé & Certifié',
-      desc: language === 'ar' ? 'معدات صيانة معتمدة مع ضمان' : 'Qualité professionnelle garantie',
+      desc: language === 'ar' ? 'معدات صيانة مختبرة' : 'Outils professionnels testés',
     },
     {
       icon: Headphones,

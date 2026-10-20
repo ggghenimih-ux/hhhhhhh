@@ -38,8 +38,8 @@ export const ProductsPage: React.FC = () => {
             </h1>
             <p className="text-xs text-slate-500 mt-1">
               {language === 'ar'
-                ? 'استعرض جميع المعدات المتوفرة في تونس مع الأسعار الرسمية والضمان'
-                : 'Tous les équipements disponibles en Tunisie avec tarifs en Dinar Tunisien et garantie'}
+                ? 'استعرض جميع المعدات المتوفرة في تونس مع الأسعار الرسمية'
+                : 'Tous les équipements disponibles en Tunisie avec tarifs en Dinar Tunisien'}
             </p>
           </div>
         </div>
