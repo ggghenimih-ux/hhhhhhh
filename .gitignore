@@ -10,6 +10,7 @@ coverage/
 !.env.example
 !.env.notifications.example
 my-key.json
+SECURITY_REVIEW.md
 
 # Local database & user uploads must never be committed
 prisma/*.db

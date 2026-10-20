@@ -20,7 +20,7 @@ export const Header: React.FC = () => {
   const { currentRoute, navigateTo } = useStoreRouting();
   const { user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const displayPhone = settings?.phone || '+216 26 383 876';
+  const displayPhone = settings?.phone?.trim() || '';
   const isAdminRoute = currentRoute.startsWith('admin');
 
   const handleAccountClick = () => {
@@ -53,14 +53,16 @@ export const Header: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-4 flex-shrink-0 text-[11px] sm:text-xs">
-              <a
-                href={`tel:${displayPhone.replace(/[\s\-\(\)]/g, '')}`}
-                className="flex items-center gap-1 text-slate-300 hover:text-white transition font-mono"
-                title="Service Client Téléphonique"
-              >
-                <Phone className="w-3 h-3 text-orange-400" />
-                <span>{displayPhone}</span>
-              </a>
+              {displayPhone && (
+                <a
+                  href={`tel:${displayPhone.replace(/[\s\-\(\)]/g, '')}`}
+                  className="flex items-center gap-1 text-slate-300 hover:text-white transition font-mono"
+                  title="Service Client Téléphonique"
+                >
+                  <Phone className="w-3 h-3 text-orange-400" />
+                  <span>{displayPhone}</span>
+                </a>
+              )}
 
               <div className="flex items-center gap-1 border-l border-slate-700 pl-3">
                 <button

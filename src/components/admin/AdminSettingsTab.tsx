@@ -26,6 +26,7 @@ export const AdminSettingsTab: React.FC = () => {
     faviconUrl: '',
     phone: '',
     whatsapp: '',
+    whatsappNumber: '',
     email: '',
     address: '',
     workingHours: '',
@@ -66,6 +67,7 @@ export const AdminSettingsTab: React.FC = () => {
         faviconUrl: settings.faviconUrl || '/logo.jpg',
         phone: settings.phone,
         whatsapp: settings.whatsapp || settings.phone,
+        whatsappNumber: settings.whatsappNumber || settings.whatsapp.replace(/\D/g, ''),
         email: settings.email || 'contact@reparation-gsm.tn',
         address: settings.address || 'Tunis,tunis',
         workingHours: settings.workingHours || 'Mar - Dim: 08:00 - 18:00 | Lundi: Fermé',
@@ -176,6 +178,10 @@ export const AdminSettingsTab: React.FC = () => {
     e.preventDefault();
     if (!formData.storeName.trim()) {
       showToast('Le nom du magasin est obligatoire.', 'error');
+      return;
+    }
+    if (!/^[1-9]\d{7,14}$/.test(formData.whatsappNumber)) {
+      showToast('Le numéro WhatsApp doit être au format international, chiffres uniquement (8 à 15 chiffres).', 'error');
       return;
     }
 
@@ -503,7 +509,7 @@ export const AdminSettingsTab: React.FC = () => {
                   type="text"
                   value={formData.phone}
                   onChange={(e) => handleChange('phone', e.target.value)}
-                  placeholder="+216 26 383 876"
+                  placeholder="Indicatif pays + numéro"
                   className="w-full text-xs p-3 rounded-xl border border-slate-300 font-mono font-bold"
                   required
                 />
@@ -521,11 +527,33 @@ export const AdminSettingsTab: React.FC = () => {
                   type="text"
                   value={formData.whatsapp}
                   onChange={(e) => handleChange('whatsapp', e.target.value)}
-                  placeholder="+216 26 383 876"
+                  placeholder="Indicatif pays + numéro"
                   className="w-full text-xs p-3 rounded-xl border border-slate-300 font-mono font-bold text-emerald-700"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
                   Utilisé pour lancer les conversations WhatsApp wa.me.
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="settings-whatsapp-number" className="text-xs font-bold text-slate-700 block mb-1.5">
+                  Numéro WhatsApp des commandes (international) *
+                </label>
+                <input
+                  id="settings-whatsapp-number"
+                  type="tel"
+                  inputMode="numeric"
+                  value={formData.whatsappNumber}
+                  onChange={(e) => handleChange('whatsappNumber', e.target.value)}
+                  placeholder="Indicatif pays + numéro"
+                  minLength={8}
+                  maxLength={15}
+                  pattern="[1-9][0-9]{7,14}"
+                  className="w-full text-xs p-3 rounded-xl border border-slate-300 font-mono font-bold text-emerald-700"
+                  required
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Indicatif international et numéro, sans « + », espaces ni tirets.
                 </p>
               </div>
 
@@ -667,7 +695,7 @@ export const AdminSettingsTab: React.FC = () => {
                   required
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Ex: 7.000 DT pour l'expédition sur les 24 gouvernorats.
+                  Frais appliqués selon la configuration actuelle de la boutique.
                 </p>
               </div>
 
@@ -686,7 +714,7 @@ export const AdminSettingsTab: React.FC = () => {
                   required
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Ex: 300 DT. Au-delà, la livraison devient 0 DT automatiquement.
+                  Les commandes dépassant ce montant bénéficient de la livraison gratuite.
                 </p>
               </div>
 
