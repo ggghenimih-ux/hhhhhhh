@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStoreRouting, useStoreSettings } from '../context/StoreSlices';
 import { api } from '../services/api';
+import { getOrderTotal } from '../lib/orderTotals';
 import {
   PackageSearch,
   CheckCircle2,
@@ -229,7 +230,7 @@ export const TrackOrderPage: React.FC = () => {
               <span className="text-[10px] uppercase font-bold text-orange-600 block mb-1">Paiement & Montant</span>
               <div className="flex justify-between">
                 <span>Total commande :</span>
-                <strong className="text-orange-600">{formatPrice(order.totalTND)}</strong>
+                <strong className="text-orange-600">{formatPrice(getOrderTotal(order))}</strong>
               </div>
               <div className="flex justify-between mt-1">
                 <span>Mode de paiement :</span>

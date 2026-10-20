@@ -2,6 +2,7 @@ import React from 'react';
 import { useStore } from '../../context/StoreContext';
 import { X, Printer, CheckCircle2 } from 'lucide-react';
 import { useDialogAccessibility } from '../../hooks/useDialogAccessibility';
+import { getOrderTotal } from '../../lib/orderTotals';
 
 interface AdminInvoiceModalProps {
   order: any | null;
@@ -120,9 +121,8 @@ export const AdminInvoiceModal: React.FC<AdminInvoiceModalProps> = ({ order, onC
               <span className="text-[11px] font-bold uppercase text-slate-400 tracking-wider block mb-1">
                 Adresse de Livraison
               </span>
-              <p className="text-xs font-semibold text-slate-800">
-                {order.governorate} {order.delegation ? `· ${order.delegation}` : ''}
-              </p>
+              <p className="text-xs font-semibold text-slate-800">Gouvernorat : {order.governorate || '—'}</p>
+              <p className="text-xs font-semibold text-slate-800">Ville : {order.city || order.delegation || order.governorate || '—'}</p>
               <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{order.address}</p>
               {order.notes && (
                 <p className="text-[11px] text-amber-700 bg-amber-50 p-1.5 rounded mt-1.5 border border-amber-200">
@@ -147,16 +147,21 @@ export const AdminInvoiceModal: React.FC<AdminInvoiceModalProps> = ({ order, onC
                 {items.map((item: any, idx: number) => (
                   <tr key={idx} className="hover:bg-slate-50/50">
                     <td className="py-3 font-medium text-slate-800 pr-2">
-                      {item.productName || item.product?.name || 'Produit GSM'}
+                      <span className="block">{item.name || item.productName || item.product?.name || 'Article'}</span>
+                      {item.variant && (
+                        <span className="block text-[10px] font-normal text-slate-500">
+                          Option : {typeof item.variant === 'string' ? item.variant : item.variant.name}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 text-center font-bold text-slate-900">
-                      {item.quantity}
+                      {item.qty ?? item.quantity}
                     </td>
                     <td className="py-3 text-end font-mono text-slate-600">
-                      {formatPrice(item.priceTND || item.price)}
+                      {formatPrice(item.unitPrice ?? item.priceTND ?? item.price)}
                     </td>
                     <td className="py-3 text-end font-mono font-bold text-slate-900">
-                      {formatPrice((item.priceTND || item.price || 0) * (item.quantity || 1))}
+                      {formatPrice(item.lineTotal ?? item.totalTND ?? (item.unitPrice ?? item.priceTND ?? item.price ?? 0) * (item.qty ?? item.quantity ?? 1))}
                     </td>
                   </tr>
                 ))}
@@ -169,7 +174,13 @@ export const AdminInvoiceModal: React.FC<AdminInvoiceModalProps> = ({ order, onC
             <div className="text-xs text-slate-600 space-y-1">
               <div className="flex items-center gap-1.5 font-semibold text-slate-800">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>Mode de règlement : Paiement à la livraison (Espèces)</span>
+                <span>
+                  Mode de règlement : {order.paymentMethod === 'cod'
+                    ? 'Paiement à la livraison (Espèces)'
+                    : order.paymentMethod === 'bank_transfer'
+                      ? 'Virement bancaire'
+                      : order.paymentMethod || '—'}
+                </span>
               </div>
               <p className="text-[11px] text-slate-500">
                 Veuillez vérifier le contenu du colis en présence du livreur avant règlement.
@@ -179,17 +190,17 @@ export const AdminInvoiceModal: React.FC<AdminInvoiceModalProps> = ({ order, onC
             <div className="w-full sm:w-64 space-y-1.5 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
               <div className="flex justify-between text-slate-600">
                 <span>Sous-total HT :</span>
-                <span className="font-mono">{formatPrice(order.subtotalTND)}</span>
+                <span className="font-mono">{formatPrice(order.subtotal ?? order.subtotalTND)}</span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Frais de livraison :</span>
                 <span className="font-mono">
-                  {order.shippingTND === 0 ? 'Gratuite' : formatPrice(order.shippingTND)}
+                  {(order.deliveryFee ?? order.shippingTND) === 0 ? 'Gratuite' : formatPrice(order.deliveryFee ?? order.shippingTND)}
                 </span>
               </div>
               <div className="flex justify-between pt-1.5 border-t border-slate-200 font-black text-sm text-slate-900">
                 <span>Net à payer (TND) :</span>
-                <span className="text-orange-600 font-mono">{formatPrice(order.totalTND)}</span>
+                <span className="text-orange-600 font-mono">{formatPrice(getOrderTotal(order))}</span>
               </div>
             </div>
           </div>

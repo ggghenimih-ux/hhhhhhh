@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, BellRing, MessageCircle, Volume2, VolumeX, X } from 'lucide-react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { Bell, BellRing, MessageCircle, Package, Volume2, VolumeX, X } from 'lucide-react';
+import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
 import { orderConfirmationMessage, whatsappLink } from '../lib/whatsapp';
+import { getOrderTotal } from '../lib/orderTotals';
 
 type NewOrderEvent = {
   id: string;
@@ -17,12 +18,14 @@ type NewOrderEvent = {
   isTest?: boolean;
 };
 
-type PendingOrder = Pick<NewOrderEvent, 'id' | 'orderNumber' | 'customerName' | 'customerPhone' | 'totalTND' | 'createdAt'>;
+type PendingOrder = Pick<NewOrderEvent, 'id' | 'orderNumber' | 'customerName' | 'customerPhone' | 'totalTND' | 'itemsCount' | 'createdAt'>;
 
 type Props = {
   /** Appelée quand l'admin clique sur une commande (ex. ouvrir la fiche de la commande) */
   onOpenOrder?: (orderId: string) => void;
   onPendingChange?: (pendingCount: number) => void;
+  onOrdersSnapshot?: (orders: (Record<string, any> & { id: string })[]) => void;
+  onUnreadChange?: (orderIds: string[]) => void;
 };
 
 const SOUND_KEY = 'admin_order_sound';
@@ -43,7 +46,12 @@ function playChime(ctx: AudioContext) {
   });
 }
 
-export default function AdminOrderNotifier({ onOpenOrder, onPendingChange }: Props) {
+export default function AdminOrderNotifier({
+  onOpenOrder,
+  onPendingChange,
+  onOrdersSnapshot,
+  onUnreadChange,
+}: Props) {
   const { user } = useAuth();
   const [pending, setPending] = useState(0);
   const [latest, setLatest] = useState<PendingOrder[]>([]);
@@ -56,6 +64,7 @@ export default function AdminOrderNotifier({ onOpenOrder, onPendingChange }: Pro
 
   const audioRef = useRef<AudioContext | null>(null);
   const soundOnRef = useRef(false);
+  const unreadOrderIds = useRef(new Set<string>());
   const baseTitle = useRef(typeof document !== 'undefined' ? document.title : '');
 
   useEffect(() => {
@@ -64,7 +73,7 @@ export default function AdminOrderNotifier({ onOpenOrder, onPendingChange }: Pro
       setSoundOn(saved);
       soundOnRef.current = saved;
     } catch {
-      /* stockage indisponible */
+      console.warn('Impossible de lire la préférence audio des notifications.');
     }
   }, []);
 
@@ -82,55 +91,70 @@ export default function AdminOrderNotifier({ onOpenOrder, onPendingChange }: Pro
     }
 
     let isInitialSnapshot = true;
-    const pendingOrdersQuery = query(collection(db, 'orders'), where('status', '==', 'PENDING'));
+    unreadOrderIds.current.clear();
+    onUnreadChange?.([]);
+    const recentOrdersQuery = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(50));
     const unsubscribe = onSnapshot(
-      pendingOrdersQuery,
+      recentOrdersQuery,
       (snapshot) => {
         const orders = snapshot.docs
           .map((orderDoc): Record<string, any> & { id: string } => {
             const data: Record<string, any> = orderDoc.data();
-            return { ...data, id: orderDoc.id };
+            const createdAt = data.createdAt && typeof data.createdAt.toDate === 'function'
+              ? data.createdAt.toDate().toISOString()
+              : data.createdAt;
+            return { ...data, createdAt, id: orderDoc.id };
           })
           .filter((order) => !order.deletedAt && !order.archivedAt)
           .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
-        setPending(orders.length);
-        setLatest(orders.slice(0, 5).map((order) => ({
+        onOrdersSnapshot?.(orders);
+        const pendingOrders = orders.filter((order) => String(order.status ?? '').toUpperCase() === 'PENDING');
+        setPending(pendingOrders.length);
+        setLatest(pendingOrders.slice(0, 5).map((order) => ({
           id: order.id,
           orderNumber: order.orderNumber ?? '',
           customerName: order.customerName ?? '',
           customerPhone: order.customerPhone ?? '',
-          totalTND: Number(order.totalTND ?? 0),
+          totalTND: getOrderTotal(order),
+          itemsCount: Array.isArray(order.items) ? order.items.length : 0,
           createdAt: order.createdAt ?? '',
         })));
 
-        if (!isInitialSnapshot) {
-          snapshot.docChanges()
-            .filter((change) => change.type === 'added')
-            .forEach((change) => {
-              const order = change.doc.data();
-              if (order.deletedAt || order.archivedAt) return;
-              const notification: NewOrderEvent = {
-                id: change.doc.id,
-                orderNumber: order.orderNumber ?? '',
-                customerName: order.customerName ?? '',
-                customerPhone: order.customerPhone ?? '',
-                governorate: order.governorate ?? '',
-                totalTND: Number(order.totalTND ?? 0),
-                itemsCount: Array.isArray(order.items) ? order.items.length : 0,
-                createdAt: order.createdAt ?? '',
-              };
-              setToasts((current) => [notification, ...current].slice(0, 4));
-              window.setTimeout(() => dismissToast(notification.id), 15000);
-              if (soundOnRef.current && audioRef.current) playChime(audioRef.current);
-              if ('vibrate' in navigator) navigator.vibrate?.([200, 100, 200]);
-              if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
-                new Notification(`Nouvelle commande ${notification.orderNumber}`, {
-                  body: `${notification.customerName} — ${notification.totalTND.toFixed(3)} DT`,
-                });
-              }
-            });
+        if (isInitialSnapshot) {
+          isInitialSnapshot = false;
+          return;
         }
-        isInitialSnapshot = false;
+
+        snapshot.docChanges().forEach((change) => {
+          const order = change.doc.data();
+          if (change.type === 'added' && !order.deletedAt && !order.archivedAt) {
+            if (!order.seenAt) unreadOrderIds.current.add(change.doc.id);
+            const notification: NewOrderEvent = {
+              id: change.doc.id,
+              orderNumber: order.orderNumber ?? '',
+              customerName: order.customerName ?? '',
+              customerPhone: order.customerPhone ?? '',
+              governorate: order.governorate ?? '',
+              totalTND: getOrderTotal(order),
+              itemsCount: Array.isArray(order.items) ? order.items.length : 0,
+              createdAt: order.createdAt ?? '',
+            };
+            setToasts((current) => [notification, ...current].slice(0, 4));
+            window.setTimeout(() => dismissToast(notification.id), 15000);
+            if (soundOnRef.current && audioRef.current) playChime(audioRef.current);
+            if ('vibrate' in navigator) navigator.vibrate?.([200, 100, 200]);
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
+              new Notification(`Nouvelle commande ${notification.orderNumber}`, {
+                body: `${notification.customerName} — ${notification.totalTND.toFixed(3)} DT`,
+              });
+            }
+          } else if (change.type === 'modified' && order.seenAt) {
+            unreadOrderIds.current.delete(change.doc.id);
+          } else if (change.type === 'removed') {
+            unreadOrderIds.current.delete(change.doc.id);
+          }
+        });
+        onUnreadChange?.([...unreadOrderIds.current]);
       },
       (error) => {
         console.error('Impossible de recevoir les commandes Firestore en temps réel:', error);
@@ -147,30 +171,40 @@ export default function AdminOrderNotifier({ onOpenOrder, onPendingChange }: Pro
     };
   }, [pending]);
 
-  const toggleSound = () => {
+  const toggleSound = async () => {
     const next = !soundOnRef.current;
-    soundOnRef.current = next;
-    setSoundOn(next);
+    if (next) {
+      try {
+        audioRef.current = audioRef.current ?? new AudioContext();
+        await audioRef.current.resume();
+        playChime(audioRef.current);
+      } catch (error) {
+        console.error('Impossible d’activer le son des notifications:', error);
+        return;
+      }
+    }
     try {
       localStorage.setItem(SOUND_KEY, next ? '1' : '0');
     } catch {
-      /* ignore */
+      console.warn('Impossible d’enregistrer la préférence audio des notifications.');
     }
-    if (next) {
-      // Le navigateur n'autorise le son qu'après un clic : on crée le contexte audio ici
-      audioRef.current = audioRef.current ?? new AudioContext();
-      void audioRef.current.resume();
-      playChime(audioRef.current);
-    }
+    soundOnRef.current = next;
+    setSoundOn(next);
   };
 
   // Si le son était activé lors d'une visite précédente, il faut un nouveau clic pour réactiver l'audio
   useEffect(() => {
     if (!soundOn) return;
     const unlock = () => {
-      audioRef.current = audioRef.current ?? new AudioContext();
-      void audioRef.current.resume();
-      window.removeEventListener('click', unlock);
+      try {
+        audioRef.current = audioRef.current ?? new AudioContext();
+        void audioRef.current.resume().catch((error) => {
+          console.warn('Impossible de réactiver le son des notifications:', error);
+        });
+        window.removeEventListener('click', unlock);
+      } catch (error) {
+        console.error('Impossible de réactiver le son des notifications:', error);
+      }
     };
     window.addEventListener('click', unlock);
     return () => window.removeEventListener('click', unlock);
@@ -191,19 +225,28 @@ export default function AdminOrderNotifier({ onOpenOrder, onPendingChange }: Pro
     <>
       {/* Cloche + pastille */}
       <div className="relative">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="relative rounded-full p-2 text-slate-200 hover:bg-white/10"
-          aria-label={`Commandes à traiter : ${pending}`}
-        >
-          {pending > 0 ? <BellRing className="h-6 w-6 text-orange-600" /> : <Bell className="h-6 w-6" />}
-          {pending > 0 && (
-            <span className="absolute -end-1 -top-1 min-w-5 rounded-full bg-red-600 px-1 text-center text-xs font-bold text-white">
-              {pending > 99 ? '99+' : pending}
-            </span>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="relative rounded-full p-2 text-slate-200 hover:bg-white/10"
+            aria-label={`Commandes à traiter : ${pending}`}
+          >
+            {pending > 0 ? <BellRing className="h-6 w-6 text-orange-600" /> : <Bell className="h-6 w-6" />}
+            {pending > 0 && (
+              <span className="absolute -end-1 -top-1 min-w-5 rounded-full bg-red-600 px-1 text-center text-xs font-bold text-white">
+                {pending > 99 ? '99+' : pending}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={toggleSound}
+            className="rounded-lg border border-slate-600 px-2.5 py-2 text-[11px] font-semibold text-slate-200 hover:bg-white/10"
+          >
+            {soundOn ? 'Notifications sonores activées' : 'Activer les notifications sonores'}
+          </button>
+        </div>
 
         {open && (
           <div className="absolute end-0 z-50 mt-2 w-80 rounded-xl border bg-white p-3 text-start shadow-xl">
@@ -219,21 +262,14 @@ export default function AdminOrderNotifier({ onOpenOrder, onPendingChange }: Pro
             <ul className="space-y-2">
               {latest.map((o) => (
                 <li key={o.id} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 p-2 text-sm">
-                  <button type="button" className="flex-1 text-start" onClick={() => openOrder(o.id)}>
-                    <div className="font-semibold">{o.orderNumber}</div>
-                    <div className="text-gray-600">
-                      {o.customerName} · {o.totalTND.toFixed(3)} DT
-                    </div>
+                  <button type="button" className="flex flex-1 items-center gap-3 text-start" onClick={() => openOrder(o.id)}>
+                    <Package className="h-5 w-5 shrink-0 text-slate-500" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold">{o.orderNumber}</span>
+                      <span className="block truncate text-gray-600">{o.customerName}</span>
+                      <span className="block text-gray-600">{o.itemsCount} article(s) · {o.totalTND.toFixed(3)} DT</span>
+                    </span>
                   </button>
-                  <a
-                    href={whatsappLink(o.customerPhone, orderConfirmationMessage(o.customerName, o.orderNumber))}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-full p-2 text-green-600 hover:bg-green-50"
-                    title="Écrire au client sur WhatsApp"
-                  >
-                    <MessageCircle className="h-5 w-5" />
-                  </a>
                 </li>
               ))}
             </ul>

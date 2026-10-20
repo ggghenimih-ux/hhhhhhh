@@ -9,7 +9,6 @@ import { AdminCategoriesTab } from '../components/admin/AdminCategoriesTab';
 import { AdminOrdersTab } from '../components/admin/AdminOrdersTab';
 import { AdminMediaTab } from '../components/admin/AdminMediaTab';
 import { AdminUsersTab } from '../components/admin/AdminUsersTab';
-import { AdminProductImportTab } from '../components/admin/AdminProductImportTab';
 import AdminOrderNotifier from '../components/AdminOrderNotifier';
 import {
   ShieldCheck,
@@ -23,14 +22,13 @@ import {
   LogOut,
   ExternalLink,
   Users,
-  Upload,
 } from 'lucide-react';
 
 export const AdminDashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
   const { currentRoute, routeParams, navigateTo } = useStore();
 
-  type TabType = 'overview' | 'settings' | 'products' | 'categories' | 'orders' | 'users' | 'media' | 'import';
+  type TabType = 'overview' | 'settings' | 'products' | 'categories' | 'orders' | 'users' | 'media';
 
   // Determine active tab from route
   const getInitialTab = (): TabType => {
@@ -64,6 +62,9 @@ export const AdminDashboardPage: React.FC = () => {
 
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [pendingOrderCount, setPendingOrderCount] = useState(0);
+  const [liveOrders, setLiveOrders] = useState<any[]>([]);
+  const [unreadOrderIds, setUnreadOrderIds] = useState<string[]>([]);
+  const [focusOrderId, setFocusOrderId] = useState<string | null>(null);
 
   // Sync activeTab when currentRoute changes
   useEffect(() => {
@@ -173,8 +174,13 @@ export const AdminDashboardPage: React.FC = () => {
 
         <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
           <AdminOrderNotifier
-            onOpenOrder={() => handleTabChange('orders')}
+            onOpenOrder={(orderId) => {
+              setFocusOrderId(orderId);
+              handleTabChange('orders');
+            }}
             onPendingChange={setPendingOrderCount}
+            onOrdersSnapshot={setLiveOrders}
+            onUnreadChange={setUnreadOrderIds}
           />
 
           <button
@@ -275,6 +281,14 @@ export const AdminDashboardPage: React.FC = () => {
               {pendingOrderCount > 99 ? '99+' : pendingOrderCount}
             </span>
           )}
+          {unreadOrderIds.length > 0 && (
+            <span
+              aria-label={`${unreadOrderIds.length} commande(s) non lue(s)`}
+              className="min-w-5 rounded-full bg-orange-500 px-1.5 py-0.5 text-center text-[10px] text-white"
+            >
+              {unreadOrderIds.length > 99 ? '99+' : unreadOrderIds.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -301,17 +315,6 @@ export const AdminDashboardPage: React.FC = () => {
           <span>Médiathèque</span>
         </button>
 
-        <button
-          onClick={() => setActiveTab('import')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition flex-shrink-0 ${
-            activeTab === 'import'
-              ? 'bg-slate-900 text-white shadow-md'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Upload className="w-4 h-4" />
-          <span>Importer des produits</span>
-        </button>
       </div>
 
       {/* Render Active Tab Component */}
@@ -339,17 +342,20 @@ export const AdminDashboardPage: React.FC = () => {
           <AdminCategoriesTab onRefreshData={loadStats} />
         )}
 
-        {activeTab === 'orders' && (
-          <AdminOrdersTab onRefreshData={loadStats} />
-        )}
+        <div hidden={activeTab !== 'orders'}>
+          <AdminOrdersTab
+            onRefreshData={loadStats}
+            ordersSnapshot={liveOrders}
+            newOrderIds={unreadOrderIds}
+            focusOrderId={focusOrderId}
+            onUnreadOrderSeen={(id) => setUnreadOrderIds((current) => current.filter((orderId) => orderId !== id))}
+          />
+        </div>
 
         {activeTab === 'users' && <AdminUsersTab />}
 
         {activeTab === 'media' && <AdminMediaTab />}
 
-        {activeTab === 'import' && (
-          <AdminProductImportTab onImportComplete={loadStats} />
-        )}
       </div>
     </div>
   );
